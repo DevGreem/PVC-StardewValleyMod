@@ -1,0 +1,106 @@
+# Design
+
+## Context
+
+See `proposal.md` for motivation. `ModEntry` owns the current speakers in `_speakers` and applies distance/occlusion gain in `UpdateSpeakerState`. `VoiceIndicator` is deliberately a draw-only, click-through HUD. `Game1.otherFarmers` already gives the current server players and their locations, and the config is a plain JSON object reloaded at startup.
+
+The current GMCM subset only supports static options (`AddBoolOption`, `AddNumberOption`, `AddTextOption`, `AddKeybind`, section titles). It cannot build a dynamic player list. A dedicated `IClickableMenu` is the reliable place for the Nearby/All views.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Silence a specific remote player locally, immediately and persistently.
+- Let the player manage both nearby farmers and anyone else in the server.
+- Keep the existing HUD visual and click-through.
+- Keep the feature local: no protocol, packet or host-authority changes.
+
+**Non-Goals:**
+
+- Muting another player's microphone for everyone.
+- Host-enforced mute lists or server moderation.
+- Clickable rows in the HUD (the menu is the interactive surface).
+- A dynamic player list inside GMCM.
+- Cross-device or cross-save synchronization of the mute list.
+- A separate mute-all/unmute-all action.
+
+## Decisions
+
+### D1 — Persist a list of `(UniqueMultiplayerID, name)` entries
+
+Add `MutedPlayers` to `ModConfig` as a list of small entries containing the long `UniqueMultiplayerID` and the last known `PlayerName`. A `PlayerMuteList` runtime service builds a `HashSet<long>` for constant-time lookup and exposes add/remove/toggle/contains operations.
+
+- **Why:** the ID is the stable lookup key; the name is only for display. A set makes the per-tick playback check cheap.
+- **Alternative rejected:** matching only by name breaks with duplicate or changed names.
+- **Normalization:** trim names, drop invalid/non-positive IDs and deduplicate by ID. The list survives restarts; reset-to-defaults clears it.
+
+### D2 — Apply mute in both receive and playback paths
+
+If a player is muted, `OnVoicePacketReceived` drops the packet before decoding, and `UpdateSpeakerState` forces the existing channel volume to zero and removes it from the mixer snapshot. When the player is unmuted, the next packet recreates/updates the channel normally.
+
+- **Why:** dropping packets saves decode work for muted players, while the playback check handles an already-open channel immediately.
+- **Alternative rejected:** muting only at the mixer still decodes and buffers audio that will never be heard.
+- **Consequence:** unmuting may take until the next voice frame; that is unavoidable and short.
+
+### D3 — Use a dedicated `PlayerMuteMenu` with Nearby and All views
+
+Add `PlayerMuteMenu : IClickableMenu`, opened by `PlayerMuteKey` (default `F10`). It has two views:
+
+- **Nearby:** `Game1.otherFarmers` in the same location and within the local player's configured voice reach. This is the same convenience radius shown in the HUD, not a separate audibility rule.
+- **All:** every current `Game1.otherFarmers` entry except the local player, with location and mute state.
+
+Each row shows the name, location and a clear muted/unmuted state. Clicking a row toggles the mute and calls `SaveConfig` immediately. The menu rebuilds its rows when opened and when the player list changes; it does not open in single-player or on top of another menu.
+
+- **Why:** one menu satisfies both requests without making the HUD capture game clicks.
+- **Alternative rejected:** GMCM cannot render a dynamic list with the current API subset.
+- **Alternative rejected:** clickable HUD rows would require hitboxes, mouse suppression and careful interaction with the game's UI; the menu is safer and more discoverable.
+
+### D4 — Add the keybind and explanation to GMCM
+
+Extend `IGenericModConfigMenuApi` with `AddParagraph` (GMCM supports it) and register:
+
+- a `Player-mute menu key` keybind;
+- a paragraph explaining that mutes are local, saved and opened with that key.
+
+GMCM does not list players; the paragraph points to the menu.
+
+- **Why:** the key must be discoverable and configurable, but the dynamic content belongs in the menu.
+- **Alternative rejected:** a text option with player names would be awkward, limited to one selection and not refresh reliably.
+
+### D5 — Keep the HUD unchanged and click-through
+
+`VoiceIndicator` continues to draw only the microphone state, voice reach and nearby speakers. It does not add hitboxes or capture clicks. The menu is the only interactive mute surface.
+
+- **Why:** the existing indicator spec explicitly requires click-through; adding clickable rows would complicate that contract.
+- **Alternative rejected:** a togglable interactive HUD overlay; defer it to a future change if players want it.
+
+### D6 — Defaults and reset
+
+- `PlayerMuteKey` defaults to `F10` (outside the existing `V`, `F7`, `F8`, `F9` bindings).
+- `MutedPlayers` starts empty; older config files load an empty list.
+- `ResetToDefaults` clears the mute list and restores the key to `F10`.
+
+- **Why:** reset should return the mod to a clean, unmuted state, and the list is part of the persisted config.
+- **Consequence:** players who reset their settings lose their saved mutes; the README and menu should make this clear.
+
+### D7 — Tests
+
+- `PlayerMuteList` tests: add, remove, toggle, duplicate handling, lookup by ID and reset.
+- `ModConfig` tests: default empty list, serialization round-trip, normalization of duplicates/invalid IDs and reset.
+- Menu-model tests: Nearby filters by location and distance; All includes players in other locations; rows are sorted and carry the mute state.
+- Manual checks: mute/unmute from Nearby, mute someone from All, restart persistence, muted player still hears the local player, and the HUD remains click-through.
+
+## Risks / Trade-offs
+
+- **`UniqueMultiplayerID` changes between sessions** → The name is kept for display but the ID is authoritative; a changed ID means the entry no longer applies. The menu shows the current players so the player can re-mute.
+- **Stale entries for absent players** → Entries are retained so a player can be muted across sessions; they are not shown in All until that player is online. Reset clears them.
+- **Keybind collision** → The default F10 is outside the other PVC defaults; the key is configurable and the existing key parsing uses the game's key names.
+- **Menu input conflicts with the game or another menu** → Do not open when another `IClickableMenu` is active; the menu owns its clicks while open.
+- **Players expect a remote mic mute** → The menu labels the action as local mute and the README explains that other players still hear the muted farmer.
+- **Reset clears the list unexpectedly** → Document the behavior in the menu/README and test it.
+
+## Migration Plan
+
+- Add `PlayerMuteKey` (`F10`) and `MutedPlayers` (empty) to the config; older files load them from the property defaults.
+- No network or protocol migration.
+- Rollback: remove the menu/keybind and the list; older builds ignore the unknown JSON fields and keep working.
