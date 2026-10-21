@@ -89,7 +89,12 @@ The menu SHALL provide an All view listing every current player in the server ex
 
 ### Requirement: Muted nearby players remain visible in the HUD
 
-The mod SHALL continue to show a nearby muted player who is speaking in the voice indicator, with a visible muted-microphone marker. Muting SHALL NOT remove the player from the nearby list while they are in range and speaking.
+The mod SHALL show a muted player in the local game location and within the voice reach used by the indicator, with a visible muted-microphone marker, even when they are not currently speaking. Muting SHALL NOT remove the player from the nearby list while they are in range. Unmuted players SHALL remain listed only while speaking.
+
+#### Scenario: Muted player is nearby and silent
+
+- **WHEN** a nearby player is muted and not speaking
+- **THEN** the HUD lists that player with a muted-microphone marker
 
 #### Scenario: Muted player speaks nearby
 
@@ -98,7 +103,7 @@ The mod SHALL continue to show a nearby muted player who is speaking in the voic
 
 #### Scenario: Muted player is out of range
 
-- **WHEN** a muted player is outside the local voice reach
+- **WHEN** a muted player is outside the voice reach used by the indicator
 - **THEN** they are not listed in the nearby HUD
 
 ### Requirement: Local-only and non-interfering
