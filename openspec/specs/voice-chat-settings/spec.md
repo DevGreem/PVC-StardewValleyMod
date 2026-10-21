@@ -97,17 +97,27 @@ The start-microphone setting SHALL be read only when initializing a multiplayer 
 
 ### Requirement: Proximity radius is chosen from a fixed set
 
-The mod SHALL offer exactly the proximity radii `3`, `10` and `20` tiles, SHALL use `10` as the documented default, and SHALL NOT accept an arbitrary value. A loaded value outside the offered set SHALL be normalized to the default.
+The mod SHALL offer exactly the proximity radii `3`, `15` and `30` tiles, SHALL use `15` as the documented default, and SHALL NOT accept an arbitrary value. On load, `3` and `15` remain unchanged, while legacy `6`, `10` and `20` normalize to `3`, `15` and `30` respectively; any other value normalizes to the default.
 
 #### Scenario: Player cycles the radius
 
 - **WHEN** the player cycles the proximity radius with the configured key
-- **THEN** the radius moves to the next offered value
+- **THEN** the radius moves through `3`, `15`, `30` and back to `3`
 
 #### Scenario: Old configuration contains a removed radius
 
-- **WHEN** the settings file contains `6` or `15` from an older build
-- **THEN** the loaded radius is normalized to the default `10` and no error is reported
+- **WHEN** the settings file contains `6`, `10` or `20` from an older build
+- **THEN** the loaded radius becomes `3`, `15` or `30` respectively and no error is reported
+
+#### Scenario: Old configuration already uses a valid legacy value
+
+- **WHEN** the settings file contains `3` or `15`
+- **THEN** the loaded radius is preserved
+
+#### Scenario: Configuration contains an arbitrary value
+
+- **WHEN** the settings file contains a radius outside the current and legacy sets
+- **THEN** the loaded radius becomes the default `15` and no error is reported
 
 ### Requirement: Microphone toggle keybind
 
@@ -164,3 +174,22 @@ The mod SHALL store a start-microphone boolean in its settings file and SHALL re
 
 - **WHEN** the start-microphone setting is enabled and a new multiplayer world loads
 - **THEN** the session microphone starts enabled if the input device can be opened
+
+### Requirement: Keybinds are inactive while typing
+
+The mod SHALL ignore its gameplay keybinds and SHALL NOT transmit push-to-talk while the chat box is active.
+
+#### Scenario: Player types the push-to-talk key in chat
+
+- **WHEN** the chat box is active and the player presses the push-to-talk key
+- **THEN** the microphone does not transmit and the character reaches the chat box
+
+#### Scenario: Player presses another PVC keybind in chat
+
+- **WHEN** the chat box is active and the player presses a PVC microphone, test, radius or player-mute keybind
+- **THEN** that action does not fire and the key is left to the chat input
+
+#### Scenario: Player closes chat
+
+- **WHEN** the chat box is closed after typing
+- **THEN** the PVC keybinds work normally again

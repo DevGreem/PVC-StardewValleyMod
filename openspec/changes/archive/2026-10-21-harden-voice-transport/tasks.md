@@ -24,7 +24,7 @@
 
 - [x] 5.1 Correct README/spec claims about proximity privacy, sender authentication and allocation limits; verify the documented behavior matches the code
 - [x] 5.2 Run `dotnet test PVC.slnx` and `dotnet build PVC.slnx`; verify all tests pass and the build has no warnings or errors
-- [ ] 5.3 Verify the security behavior in a focused test or headless run: no broadcast for an out-of-range peer, no limiter growth for an unknown sender, no PTT transmission from chat, and sanitized names in the HUD/menu
+- [x] 5.3 Verify the security behavior in a focused test or headless run: no broadcast for an out-of-range peer, no limiter growth for an unknown sender, no PTT transmission from chat, and sanitized names in the HUD/menu
 
 ## Workflow follow-up
 
