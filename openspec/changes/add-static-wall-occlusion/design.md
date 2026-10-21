@@ -13,12 +13,14 @@ The reference mod `dailyxcz/StardewValleyMods` (`VoiceChat`) already implements 
 - Make static Stardew Valley walls audible as obstacles without a network protocol change.
 - Produce the three requested outcomes: quieter, muffled and silent.
 - Keep the calculation local, allocation-free on the audio thread and cheap enough to run every tick.
-- Give players a local toggle so the feature can be compared or disabled.
+- Give the host a single authoritative toggle so every player hears a coherent occlusion model.
+- Fall back to occlusion enabled when the host does not run the mod, without allowing clients to change it.
 
 **Non-Goals:**
 
 - Player-placed objects, trees, fences, furniture or other dynamic blocks; they are tracked for a future change.
 - Per-material or per-object occlusion levels.
+- Per-client overrides of the host's occlusion setting.
 - `Back` or `Front` map layers, water, cliffs, windows or line-of-sight through floors.
 - Stereo panning, reverberation or a full acoustic model.
 - Any packet, version or transport change.
@@ -68,27 +70,47 @@ For each speaker that is already in range, compute the blocked-tile count from `
 - **Alternative rejected:** computing on packet receipt would leave stale occlusion while a player stands still.
 - **Performance:** at most 8 mixed speakers × roughly 40 samples per line per tick; far speakers are skipped before the walk.
 
-### D6 — `WallOcclusion` is a local, live, default-on setting
+### D6 — `WallOcclusion` is a host-authoritative setting
 
-Add `WallOcclusion` (boolean, default `true`) to `ModConfig`, `ResetToDefaults`, GMCM and the README. It is read by `UpdateSpeakerState`; toggling it applies on the next tick. It is never sent to other players.
+`WallOcclusion` is persisted as the host's preference. Only `Context.IsMainPlayer` can change it. The mod keeps a separate `effective` value used by playback: the host uses its persisted preference; a client starts at `true` and applies the host's value when it arrives. A client's local config value is ignored during the session, and a client attempt to change the setting is rejected.
 
-- **Why:** it lets players compare the effect and opt out, and it makes manual testing possible without a rebuild.
-- **Alternative rejected:** always-on has no escape hatch if a map produces false positives.
-- **Consequence:** two players in the same session can hear the same speaker differently if one disables occlusion; that is intentional and local.
+- **Why:** every player must hear a coherent occlusion model, and the host is the only player all clients can agree on.
+- **Alternative rejected:** local per-player control lets one listener hear through walls while another does not, which was the original ambiguous behavior.
+- **Fallback:** if the host does not run PVC, no host value arrives; clients keep `true` and cannot change it.
+- **Consequence:** the GMCM control is effectively read-only for clients; the tooltip explains that the host owns it.
 
-### D7 — Tests are split between pure math and map-independent line walking
+### D7 — Synchronize the host value with a dedicated SMAPI message
+
+Add `WallOcclusionMessage { bool Enabled }` and a `wall-occlusion` message type. The host sends it:
+
+- after a save loads, when the host is the main player;
+- when a peer connects, targeted at that peer;
+- when the host changes the value.
+
+A client applies the message only when all of these hold: it is not the main player, the sender is `Game1.MasterPlayer`, the mod ID matches, and the type matches. Other clients cannot spoof another sender's player ID through SMAPI. The host ignores settings messages from clients.
+
+- **Why:** a dedicated message is smaller and easier to validate than adding a field to every voice packet, and the voice wire format stays unchanged.
+- **Alternative rejected:** putting the boolean in each voice packet wastes bandwidth and mixes a session setting with media.
+- **Late join:** `PeerConnected` re-sends the current value, so a client that joins after the initial broadcast is brought up to date.
+
+### D8 — Tests are split between pure math, line walking and sync policy
 
 - `OcclusionMath` tests cover 0/1/2/3+ blockers, monotonic gain, alpha floor and silence.
 - A line-walk test uses a small fake grid to cover clear lines, one wall, open doors and diagonal walls.
 - `SpeakerChannel` tests cover filter state, gain composition and reset.
+- Sync-policy tests cover host-only acceptance, client fallback to `true` without a host value, and rejection of non-host senders.
 - Config tests cover default true, reset and old-config load.
-- Manual two-player checks cover a thin wall, a thick wall/building interior and the toggle.
+- Manual two-player checks cover a thin wall, a thick wall/building interior, the host toggle and the client's inability to override it.
 
 ## Risks / Trade-offs
 
+- **A client expects a local escape hatch** → The setting is intentionally read-only for clients; the tooltip and README explain that the host owns it.
+- **Host does not run PVC** → No host message arrives; clients keep occlusion enabled and cannot change it.
+- **Host changes the value while a client is joining** → The host sends the current value on `PeerConnected`; the latest host message wins.
+- **A malicious client sends a settings message** → Only messages from `Game1.MasterPlayer` with the PVC mod ID and message type are accepted.
 - **Decorative `Buildings` tiles count as blockers** → The layer is the reference's proven choice; `Passable` excludes open doors. If a specific map decoration causes false positives, a later change can add tile-property filtering.
-- **A single thick wall can reach the three-tile silence threshold** → This is realistic for a solid building wall, but it is the most likely tuning complaint. The constants are isolated in `OcclusionMath` and the toggle disables the feature.
-- **Low-pass dulls speech** → Use a mild alpha for one wall and the toggle; tune after listening tests without changing the spec.
+- **A single thick wall can reach the three-tile silence threshold** → This is realistic for a solid building wall, but it is the most likely tuning complaint. The constants are isolated in `OcclusionMath` and the host can disable the feature.
+- **Low-pass dulls speech** → Use a mild alpha for one wall and let the host disable it; tune after listening tests without changing the spec.
 - **Modded maps may lack a `Buildings` layer or use custom tiles** → Missing layer means no occlusion; custom tiles still use the `Passable` property. This is a safe degradation.
 - **Dynamic objects remain inaudible through** → Explicit non-goal; the future SP task covers trees, fences and per-object levels.
 - **Game-thread cost** → Only in-range speakers are walked, lines are capped by the voice reach and the walk is allocation-free.
@@ -97,8 +119,9 @@ Add `WallOcclusion` (boolean, default `true`) to `ModConfig`, `ResetToDefaults`,
 ## Migration Plan
 
 - Add the `WallOcclusion` field with a default of `true`; older config files load it as `true`.
-- No wire-format change and no data migration.
-- Rollback: set `WallOcclusion` to `false` or remove the field; old builds ignore an unknown JSON field and keep working.
+- The field is the host's preference. Clients keep their local field for when they host, but ignore it while connected to another host.
+- No voice wire-format change; the new settings message is additive.
+- Rollback: the host sets `WallOcclusion` to `false` or removes the field; old builds ignore the message type and the unknown JSON field.
 
 ## Open Questions
 
