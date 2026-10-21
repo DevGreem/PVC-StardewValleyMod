@@ -21,6 +21,7 @@ The reference mod `dailyxcz/StardewValleyMods` (`VoiceChat`) already implements 
 - Player-placed objects, trees, fences, furniture or other dynamic blocks; they are tracked for a future change.
 - Per-material or per-object occlusion levels.
 - Per-client overrides of the host's occlusion setting.
+- A full cave reverb/echo effect; this change uses a quieter, muffled cave preset instead.
 - `Back` or `Front` map layers, water, cliffs, windows or line-of-sight through floors.
 - Stereo panning, reverberation or a full acoustic model.
 - Any packet, version or transport change.
@@ -29,32 +30,35 @@ The reference mod `dailyxcz/StardewValleyMods` (`VoiceChat`) already implements 
 
 ### D1 — Use the `Buildings` layer and constructed building footprints
 
-`CountBlockingTiles` counts two sources: solid tiles in `location.Map.GetLayer("Buildings")`, and tiles covered by each building in `location.buildings` (`Building.occupiesTile(x, y, applyTilePropertyRadius: false)`). The first covers static house walls, building shells and closed doors; the second covers cabins, sheds, barns and coops, which are `Building` objects rather than map tiles. The manual cabin test showed why both are needed: a cabin between two farmers was not in the map layer, so it did not block.
+`CountObstacles` counts two sources: solid tiles in `location.Map.GetLayer("Buildings")`, and constructions in `location.buildings` (`Building.occupiesTile(x, y, applyTilePropertyRadius: false)`). The first covers static house walls, building shells and closed doors; the second covers cabins, sheds, barns and coops, which are `Building` objects rather than map tiles. The manual cabin test showed why both are needed: a cabin between two farmers was not in the map layer, so it did not block.
 
 - **Why:** it matches the visible static geometry the player expects to block sound, including player-constructed buildings.
 - **Alternative rejected:** only the `Buildings` layer misses cabins, sheds, barns and coops.
 - **Alternative rejected:** `GameLocation.isTilePassable` also sees objects, terrain and characters, which would mix dynamic blocks into this change.
 - **Alternative rejected:** the `Back` layer includes floors, water and cliffs; counting it would create false positives and is deferred.
-- **Consequence:** a building footprint can contribute many tiles, so a cabin or shed between two farmers can reach the silence threshold. That is the intended behavior for a solid building.
+- **Consequence:** a contiguous wall run and each building count once, so a cabin between two farmers reduces and muffles the voice without silencing it.
 
-### D2 — Walk the line with 2× oversampling
+### D2 — Walk the line and count obstacle runs
 
-Sample the segment from the speaker tile to the listener tile at two samples per tile, skip the endpoints, round to tile coordinates and ignore consecutive duplicate tiles. A tile blocks when it is inside a constructed building footprint or when it is a non-null map tile that is not marked passable. A `Passable` property with a true value (`T`/`true`) means an open door and does not block; a false value or no property means a solid tile.
+Sample the segment from the speaker tile to the listener tile at two samples per tile, skip the endpoints, round to tile coordinates and ignore consecutive duplicate tiles. Each sample gets an obstacle id: `0` for clear ground, a negative value for the map wall run and a positive value for a constructed building. Consecutive samples with the same id count as one obstacle; a change from clear to blocked starts a new obstacle.
 
-- **Why:** two samples per tile avoid skipping a one-tile diagonal wall, and the endpoint skip avoids counting the tile a farmer stands on.
+A `Passable` property with a true value (`T`/`true`) means an open door and does not block; a false value or no property means a solid tile.
+
+- **Why:** two samples per tile avoid skipping a one-tile diagonal wall, and counting runs rather than tiles keeps a thick wall or a whole cabin from becoming artificially silent.
+- **Alternative rejected:** counting every solid tile makes a five-tile cabin count as five obstacles and silence the voice, which the manual test showed is too aggressive.
 - **Alternative rejected:** a full supercover/Bresenham implementation is more code for a line that is at most the voice reach (20 tiles).
-- **Consequence:** a thick wall naturally contributes more than one blocker, which is desirable.
 
-### D3 — One blocker is quieter, two are heavily muffled, three or more are silent
+### D3 — One obstacle is quieter, two are heavily muffled, three or more are silent
 
 Use a pure occlusion helper:
 
-- `Gain = max(0, 1 - 0.4 × blockedTiles)`: 0 blockers = 1.0, 1 = 0.6, 2 = 0.2, 3+ = 0.0.
-- `LowPassAlpha = max(0.08, 1 - 0.45 × blockedTiles)`: 0 blockers = 1.0 (passthrough), 1 = 0.55, 2 = 0.10, 3+ = 0.08 (irrelevant when gain is zero).
+- `Gain = max(0, 1 - 0.4 × obstacles)`: 0 = 1.0, 1 = 0.6, 2 = 0.2, 3+ = 0.0.
+- `LowPassAlpha = max(0.08, 1 - 0.45 × obstacles)`: 0 = 1.0 (passthrough), 1 = 0.55, 2 = 0.10, 3+ = 0.08 (irrelevant when gain is zero).
 
 - **Why:** it produces the requested progression and is simple to test as pure math.
 - **Alternative rejected:** the reference's low-pass-only model never reaches silence and has no volume attenuation.
-- **Alternative rejected:** a binary wall check is too crude and makes every fence-sized obstacle an all-or-nothing event.
+- **Alternative rejected:** counting tiles instead of obstacles makes one cabin wall silent; the user asked for a quieter, muffled voice in that case.
+- **Consequence:** one cabin or one thick wall is audible but clearly occluded; three separate obstacles are needed for silence.
 
 ### D4 — Apply the low-pass per `SpeakerChannel`
 
@@ -66,7 +70,7 @@ Use a pure occlusion helper:
 
 ### D5 — Compute occlusion in `UpdateSpeakerState` on the game thread
 
-For each speaker that is already in range, compute the blocked-tile count from `farmer.Tile` to `Game1.player.Tile`, then set the channel's gain and low-pass target. Recompute every tick so walking, doors and map changes take effect without packets.
+For each speaker that is already in range, count the obstacles from `farmer.Tile` to `Game1.player.Tile`, then set the channel's gain and low-pass target. Recompute every tick so walking, doors and map changes take effect without packets.
 
 - **Why:** map access belongs on the game thread; packets are not the right trigger because they do not change when a wall or door changes.
 - **Alternative rejected:** computing on packet receipt would leave stale occlusion while a player stands still.
@@ -97,13 +101,23 @@ A client applies the message only when all of these hold: it is not the main pla
 
 ### D8 — Tests are split between pure math, line walking and sync policy
 
-- `OcclusionMath` tests cover 0/1/2/3+ blockers, monotonic gain, alpha floor and silence.
+- `OcclusionMath` tests cover 0/1/2/3+ obstacles, monotonic gain, alpha floor and silence.
 - A line-walk test uses a small fake grid to cover clear lines, one wall, open doors and diagonal walls.
-- A building-footprint test simulates a multi-tile cabin/shed footprint and verifies it contributes enough blockers to reach the silence threshold.
+- Obstacle tests cover a thick wall as one run, two separated walls as two, one multi-tile building as one, and two buildings as two.
+- `EnvironmentAcoustics` tests cover the cave gain and low-pass ceiling.
 - `SpeakerChannel` tests cover filter state, gain composition and reset.
 - Sync-policy tests cover host-only acceptance, client fallback to `true` without a host value, and rejection of non-host senders.
 - Config tests cover default true, reset and old-config load.
-- Manual two-player checks cover a thin wall, a thick wall/building interior, the host toggle and the client's inability to override it.
+- Manual two-player checks cover a thin wall, a thick wall, a cabin (audible but quiet), the host toggle, the client lock and a cave.
+
+### D9 — Caves use a quieter, muffled environment preset
+
+`EnvironmentAcoustics` detects `MineShaft`, `FarmCave` and `IslandFarmCave`. In those locations it multiplies the final gain by `0.55` and caps the low-pass alpha at `0.35`, independently of `WallOcclusion`. The effect composes with distance and obstacle gain.
+
+- **Why:** caves should sound enclosed and distant even when there is no wall directly between the farmers.
+- **Alternative rejected:** a full reverb/echo effect is more DSP work and was not required; a quieter, muffled preset gives the requested atmosphere with much less risk.
+- **Consequence:** disabling wall occlusion does not make caves sound like the open air; the cave preset is environmental, not an occlusion setting.
+- **Future:** a proper cave echo/reverb can be added later without changing the cave detection or the composition point.
 
 ## Risks / Trade-offs
 
@@ -111,10 +125,11 @@ A client applies the message only when all of these hold: it is not the main pla
 - **Host does not run PVC** → No host message arrives; clients keep occlusion enabled and cannot change it.
 - **Host changes the value while a client is joining** → The host sends the current value on `PeerConnected`; the latest host message wins.
 - **A malicious client sends a settings message** → Only messages from `Game1.MasterPlayer` with the PVC mod ID and message type are accepted.
-- **Decorative `Buildings` tiles count as blockers** → The layer is the reference's proven choice; `Passable` excludes open doors. If a specific map decoration causes false positives, a later change can add tile-property filtering.
-- **A single thick wall can reach the three-tile silence threshold** → This is realistic for a solid building wall, but it is the most likely tuning complaint. The constants are isolated in `OcclusionMath` and the host can disable the feature.
-- **Low-pass dulls speech** → Use a mild alpha for one wall and let the host disable it; tune after listening tests without changing the spec.
-- **Constructed building footprints include the whole building, including the door tile** → This is correct for a solid cabin/shed seen from outside; a future change can treat open doorways as pass-through if needed.
+- **Decorative `Buildings` tiles count as obstacles** → The layer is the reference's proven choice; `Passable` excludes open doors. If a specific map decoration causes false positives, a later change can add tile-property filtering.
+- **A single thick wall or cabin is now quieter instead of silent** → This is intentional after the manual test; three separate obstacles are required for silence. The constants are isolated in `OcclusionMath` and the host can disable the feature.
+- **Low-pass dulls speech** → Use a mild alpha for one obstacle and let the host disable it; tune after listening tests without changing the spec.
+- **Caves are always quieter, even if the host disables wall occlusion** → The cave preset is environmental; `WallOcclusion` only controls static obstacles. Documented and intentional.
+- **Constructed building footprints include the whole building, including the door tile** → A cabin counts as one obstacle, so a voice through a doorway is quieter but audible. A future change can treat open doorways as pass-through if needed.
 - **Modded maps may lack a `Buildings` layer or use custom tiles** → Missing layer still allows constructed building footprints to count; custom tiles still use the `Passable` property. This is a safe degradation.
 - **Dynamic objects remain inaudible through** → Explicit non-goal; the future SP task covers trees, fences and per-object levels.
 - **Game-thread cost** → Only in-range speakers are walked, lines are capped by the voice reach and the walk is allocation-free.
