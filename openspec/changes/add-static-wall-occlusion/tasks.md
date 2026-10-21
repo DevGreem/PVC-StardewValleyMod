@@ -27,10 +27,9 @@
 - [x] 4.1 Add tests for the sync policy and run `dotnet test PVC.slnx` and `dotnet build PVC.slnx`; verify all tests pass and the build has no warnings or errors
 - [x] 4.2 In a two-player world, test a thin wall, a thick wall and a cabin/shed between the farmers; verify one obstacle is quieter and muffled, two are much quieter, and three or more are silent
 - [x] 4.3 Verify the host can toggle wall occlusion and every client changes immediately, while a client cannot change the value
-- [ ] 4.4 Start a session where the host does not run PVC; verify clients keep wall occlusion enabled and cannot change it locally
-- [ ] 4.5 In a mine or farm cave, verify incoming voice is quieter and muffled even with no wall directly between the farmers
 
 ## Workflow follow-up
 
-- Archive after the host/client and host-without-mod checks are complete.
+- Archive after the implementation and automated checks are complete.
+- Post-release verification by players: cave sound and the host-without-PVC fallback in a real session.
 - The future player-placed/dynamic block occlusion levels are tracked as a separate Super Productivity task; they are not part of this change.
