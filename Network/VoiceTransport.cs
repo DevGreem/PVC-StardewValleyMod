@@ -29,6 +29,7 @@ public sealed class VoiceTransport : IDisposable
     private int _queuedPackets;
     private bool _loggedFirstReceive;
     private bool _loggedFirstOwnPacketIgnored;
+    private bool _loggedNoRecipients;
 
     public VoiceTransport(IModHelper helper, IMonitor monitor)
     {
@@ -65,7 +66,17 @@ public sealed class VoiceTransport : IDisposable
             {
                 long[] recipients = GetVoiceRecipients(packet);
                 if (recipients.Length == 0)
+                {
+                    if (!this._loggedNoRecipients)
+                    {
+                        this._loggedNoRecipients = true;
+                        this._monitor.Log(
+                            $"No voice recipients for location '{packet.LocationName}' at radius {packet.ProximityRadius}; farmers={Game1.otherFarmers?.Count ?? 0}.",
+                            LogLevel.Trace);
+                    }
+
                     continue;
+                }
 
                 byte[] bytes = packet.Serialize();
                 this._helper.Multiplayer.SendMessage(
@@ -89,10 +100,15 @@ public sealed class VoiceTransport : IDisposable
             return Array.Empty<long>();
 
         List<VoiceRecipientCandidate> candidates = new();
+        HashSet<long> candidateIds = new();
         foreach (Farmer farmer in Game1.otherFarmers.Values)
         {
-            if (farmer.UniqueMultiplayerID == local.UniqueMultiplayerID || farmer.currentLocation is null)
+            if (farmer.UniqueMultiplayerID == local.UniqueMultiplayerID
+                || farmer.currentLocation is null
+                || !candidateIds.Add(farmer.UniqueMultiplayerID))
+            {
                 continue;
+            }
 
             candidates.Add(new VoiceRecipientCandidate(
                 farmer.UniqueMultiplayerID,
@@ -101,17 +117,35 @@ public sealed class VoiceTransport : IDisposable
                 farmer.Tile.Y));
         }
 
+        // A farmhand's Game1.otherFarmers does not always include the host.
+        // Include the master player explicitly so client-to-host voice still works.
+        Farmer? host = !Context.IsMainPlayer ? Game1.MasterPlayer : null;
+        if (host is not null
+            && host.UniqueMultiplayerID != local.UniqueMultiplayerID
+            && host.currentLocation is not null
+            && candidateIds.Add(host.UniqueMultiplayerID))
+        {
+            candidates.Add(new VoiceRecipientCandidate(
+                host.UniqueMultiplayerID,
+                host.currentLocation.NameOrUniqueName,
+                host.Tile.X,
+                host.Tile.Y));
+        }
+
         return VoiceRecipientRules.Select(
-            packet.LocationName,
+            local.currentLocation.NameOrUniqueName,
             local.Tile.X,
             local.Tile.Y,
             packet.ProximityRadius,
             candidates);
     }
 
-    /// <summary>Get whether an envelope sender ID belongs to a current farmer.</summary>
-    public static bool IsKnownFarmer(long playerId, IEnumerable<long> farmerIds)
+    /// <summary>Get whether an envelope sender ID belongs to a current farmer or the host.</summary>
+    public static bool IsKnownFarmer(long playerId, IEnumerable<long> farmerIds, long hostPlayerId = 0L)
     {
+        if (playerId > 0L && playerId == hostPlayerId)
+            return true;
+
         foreach (long farmerId in farmerIds)
         {
             if (farmerId == playerId)
@@ -179,8 +213,11 @@ public sealed class VoiceTransport : IDisposable
             return;
         }
 
+        long hostPlayerId = !Context.IsMainPlayer
+            ? Game1.MasterPlayer?.UniqueMultiplayerID ?? 0L
+            : 0L;
         if (Game1.otherFarmers is null
-            || !IsKnownFarmer(e.FromPlayerID, Game1.otherFarmers.Keys))
+            || !IsKnownFarmer(e.FromPlayerID, Game1.otherFarmers.Keys, hostPlayerId))
         {
             return;
         }
