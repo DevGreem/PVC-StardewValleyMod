@@ -27,17 +27,19 @@ The reference mod `dailyxcz/StardewValleyMods` (`VoiceChat`) already implements 
 
 ## Decisions
 
-### D1 — Use the `Buildings` layer as the static-wall source
+### D1 — Use the `Buildings` layer and constructed building footprints
 
-`CountBlockingTiles` reads `location.Map.GetLayer("Buildings")`. Static house walls, building shells and closed doors live there; floor decorations and terrain do not. Dynamic trees, fences and furniture live in the game's object/terrain collections, which keeps them out of this MVP automatically.
+`CountBlockingTiles` counts two sources: solid tiles in `location.Map.GetLayer("Buildings")`, and tiles covered by each building in `location.buildings` (`Building.occupiesTile(x, y, applyTilePropertyRadius: false)`). The first covers static house walls, building shells and closed doors; the second covers cabins, sheds, barns and coops, which are `Building` objects rather than map tiles. The manual cabin test showed why both are needed: a cabin between two farmers was not in the map layer, so it did not block.
 
-- **Why:** it matches the visible static geometry the player expects to block sound, and it is the same layer choice as the reference implementation.
+- **Why:** it matches the visible static geometry the player expects to block sound, including player-constructed buildings.
+- **Alternative rejected:** only the `Buildings` layer misses cabins, sheds, barns and coops.
 - **Alternative rejected:** `GameLocation.isTilePassable` also sees objects, terrain and characters, which would mix dynamic blocks into this change.
 - **Alternative rejected:** the `Back` layer includes floors, water and cliffs; counting it would create false positives and is deferred.
+- **Consequence:** a building footprint can contribute many tiles, so a cabin or shed between two farmers can reach the silence threshold. That is the intended behavior for a solid building.
 
 ### D2 — Walk the line with 2× oversampling
 
-Sample the segment from the speaker tile to the listener tile at two samples per tile, skip the endpoints, round to tile coordinates and ignore consecutive duplicate tiles. A tile blocks when it is non-null and is not marked passable. A `Passable` property with a true value (`T`/`true`) means an open door and does not block; a false value or no property means a solid tile.
+Sample the segment from the speaker tile to the listener tile at two samples per tile, skip the endpoints, round to tile coordinates and ignore consecutive duplicate tiles. A tile blocks when it is inside a constructed building footprint or when it is a non-null map tile that is not marked passable. A `Passable` property with a true value (`T`/`true`) means an open door and does not block; a false value or no property means a solid tile.
 
 - **Why:** two samples per tile avoid skipping a one-tile diagonal wall, and the endpoint skip avoids counting the tile a farmer stands on.
 - **Alternative rejected:** a full supercover/Bresenham implementation is more code for a line that is at most the voice reach (20 tiles).
@@ -97,6 +99,7 @@ A client applies the message only when all of these hold: it is not the main pla
 
 - `OcclusionMath` tests cover 0/1/2/3+ blockers, monotonic gain, alpha floor and silence.
 - A line-walk test uses a small fake grid to cover clear lines, one wall, open doors and diagonal walls.
+- A building-footprint test simulates a multi-tile cabin/shed footprint and verifies it contributes enough blockers to reach the silence threshold.
 - `SpeakerChannel` tests cover filter state, gain composition and reset.
 - Sync-policy tests cover host-only acceptance, client fallback to `true` without a host value, and rejection of non-host senders.
 - Config tests cover default true, reset and old-config load.
@@ -111,7 +114,8 @@ A client applies the message only when all of these hold: it is not the main pla
 - **Decorative `Buildings` tiles count as blockers** → The layer is the reference's proven choice; `Passable` excludes open doors. If a specific map decoration causes false positives, a later change can add tile-property filtering.
 - **A single thick wall can reach the three-tile silence threshold** → This is realistic for a solid building wall, but it is the most likely tuning complaint. The constants are isolated in `OcclusionMath` and the host can disable the feature.
 - **Low-pass dulls speech** → Use a mild alpha for one wall and let the host disable it; tune after listening tests without changing the spec.
-- **Modded maps may lack a `Buildings` layer or use custom tiles** → Missing layer means no occlusion; custom tiles still use the `Passable` property. This is a safe degradation.
+- **Constructed building footprints include the whole building, including the door tile** → This is correct for a solid cabin/shed seen from outside; a future change can treat open doorways as pass-through if needed.
+- **Modded maps may lack a `Buildings` layer or use custom tiles** → Missing layer still allows constructed building footprints to count; custom tiles still use the `Passable` property. This is a safe degradation.
 - **Dynamic objects remain inaudible through** → Explicit non-goal; the future SP task covers trees, fences and per-object levels.
 - **Game-thread cost** → Only in-range speakers are walked, lines are capped by the voice reach and the walk is allocation-free.
 - **Audio-thread cost** → One one-pole filter per active channel; negligible compared with Opus decode and mixing.

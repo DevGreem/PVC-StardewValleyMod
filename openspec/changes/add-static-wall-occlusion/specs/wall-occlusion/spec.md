@@ -8,11 +8,11 @@ Determines whether static map walls block the line of sight between two farmers,
 
 ### Requirement: Static wall line of sight
 
-The mod SHALL trace the line between the speaker and the listener through the current location's static building geometry and count the solid tiles that line crosses. Only solid tiles on the map's static buildings layer SHALL count; open or passable doors SHALL NOT count.
+The mod SHALL trace the line between the speaker and the listener through the current location's static building geometry and count the solid tiles that line crosses. Solid tiles on the map's static buildings layer and the footprints of constructed buildings (cabins, sheds, barns, coops) SHALL count; open or passable doors on the map layer SHALL NOT count.
 
 #### Scenario: Clear line of sight
 
-- **WHEN** no solid static tile lies between the speaker and the listener
+- **WHEN** no solid static tile or constructed building lies between the speaker and the listener
 - **THEN** the speaker is not occluded
 
 #### Scenario: Wall between the farmers
@@ -20,19 +20,24 @@ The mod SHALL trace the line between the speaker and the listener through the cu
 - **WHEN** the line crosses a solid static wall tile
 - **THEN** the speaker is occluded
 
+#### Scenario: Cabin between the farmers
+
+- **WHEN** the line crosses a constructed cabin, shed, barn or coop
+- **THEN** the building's footprint counts as multiple solid tiles and occludes the speaker
+
 #### Scenario: Open door
 
-- **WHEN** the line crosses a door tile marked as passable
+- **WHEN** the line crosses a door tile marked as passable on the map layer
 - **THEN** the door does not count as an occluder
 
 #### Scenario: Dynamic objects are out of scope
 
-- **WHEN** the line crosses a tree, fence, furniture or other player-placed object rather than a static map tile
+- **WHEN** the line crosses a tree, fence, furniture or other player-placed object rather than a static map tile or a constructed building
 - **THEN** that object does not count as an occluder in this change
 
 #### Scenario: Location without static geometry
 
-- **WHEN** the current location has no static building layer
+- **WHEN** the current location has neither a static building layer nor constructed buildings
 - **THEN** no static wall occlusion is applied
 
 ### Requirement: Occlusion levels

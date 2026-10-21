@@ -6,7 +6,7 @@ Voice currently ignores map geometry. Two farmers separated by a house wall hear
 
 ## What Changes
 
-- Add **static wall occlusion** to incoming voice: before a speaker is mixed, trace the line between the speaker and the listener over the current location's `Buildings` layer.
+- Add **static wall occlusion** to incoming voice: before a speaker is mixed, trace the line between the speaker and the listener over the current location's `Buildings` layer and the footprints of constructed buildings (cabins, sheds, barns, coops).
 - Count the solid static tiles crossed by that line. A single wall makes the speaker quieter and muffled; two walls make the voice much quieter and heavily muffled; three or more walls make it silent. Open or passable doors do not count.
 - Compose the occlusion gain with the existing distance falloff, so a speaker behind a wall is always quieter than the same speaker in the open at the same distance.
 - Apply a short per-speaker low-pass filter so walking behind a wall sounds like muffling rather than an abrupt volume step.
@@ -28,7 +28,7 @@ Voice currently ignores map geometry. Two farmers separated by a house wall hear
 
 ## Impact
 
-- **Code**: new static-geometry helper around the `Buildings` layer, a pure occlusion math helper, per-channel low-pass filtering in `SpeakerChannel`, occlusion composition in `ModEntry.UpdateSpeakerState`, `ModConfig`, `GmcmIntegration`, tests and `README.md`.
+- **Code**: new static-geometry helper around the `Buildings` layer and `GameLocation.buildings` footprints, a pure occlusion math helper, per-channel low-pass filtering in `SpeakerChannel`, occlusion composition in `ModEntry.UpdateSpeakerState`, `ModConfig`, `GmcmIntegration`, tests and `README.md`.
 - **Settings**: one additive boolean `WallOcclusion` (default `true`), persisted as the host's preference. Clients ignore their local value during a session and use the host's value.
 - **Performance**: a short line walk (at most a few dozen tile samples per audible speaker per tick) plus one one-pole filter per speaking channel; a tiny settings message on host changes and peer connects.
 - **Compatibility**: no voice wire-format change and no new voice packet field. A separate SMAPI settings message carries the host boolean. Occlusion itself is still computed locally by each client.
