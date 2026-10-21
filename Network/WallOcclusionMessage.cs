@@ -4,4 +4,7 @@ namespace ProximityVoiceChat.Network;
 public sealed class WallOcclusionMessage
 {
     public bool Enabled { get; set; }
+
+    /// <summary>True when a client is asking the host for the current value.</summary>
+    public bool Request { get; set; }
 }

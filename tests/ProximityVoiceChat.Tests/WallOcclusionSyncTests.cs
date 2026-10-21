@@ -57,6 +57,51 @@ public class WallOcclusionSyncTests
     }
 
     [Fact]
+    public void ShouldReplyToRequest_OnlyTheHostAnswersOtherPlayers()
+    {
+        Assert.True(WallOcclusionSync.ShouldReplyToRequest(
+            isMainPlayer: true,
+            fromPlayerId: 7,
+            localPlayerId: 42,
+            fromModId: ModConstants.ModId,
+            type: ModConstants.WallOcclusionMessageType,
+            request: true));
+
+        Assert.False(WallOcclusionSync.ShouldReplyToRequest(
+            isMainPlayer: true,
+            fromPlayerId: 7,
+            localPlayerId: 42,
+            fromModId: ModConstants.ModId,
+            type: ModConstants.WallOcclusionMessageType,
+            request: false));
+
+        Assert.False(WallOcclusionSync.ShouldReplyToRequest(
+            isMainPlayer: false,
+            fromPlayerId: 7,
+            localPlayerId: 42,
+            fromModId: ModConstants.ModId,
+            type: ModConstants.WallOcclusionMessageType,
+            request: true));
+
+        Assert.False(WallOcclusionSync.ShouldReplyToRequest(
+            isMainPlayer: true,
+            fromPlayerId: 42,
+            localPlayerId: 42,
+            fromModId: ModConstants.ModId,
+            type: ModConstants.WallOcclusionMessageType,
+            request: true));
+    }
+
+    [Fact]
+    public void IsSettingsMessage_RequiresTheModAndMessageType()
+    {
+        Assert.True(WallOcclusionSync.IsSettingsMessage(ModConstants.ModId, ModConstants.WallOcclusionMessageType));
+        Assert.False(WallOcclusionSync.IsSettingsMessage("Someone.Else", ModConstants.WallOcclusionMessageType));
+        Assert.False(WallOcclusionSync.IsSettingsMessage(ModConstants.ModId, "voice"));
+        Assert.False(WallOcclusionSync.IsSettingsMessage(null, null));
+    }
+
+    [Fact]
     public void ResolveEffective_HostUsesItsPersistedPreference()
     {
         Assert.False(WallOcclusionSync.ResolveEffective(

@@ -236,6 +236,8 @@ public sealed class ModEntry : Mod
 
         if (Context.IsMainPlayer)
             this.SendWallOcclusion();
+        else
+            this.RequestWallOcclusion();
     }
 
     /// <summary>Apply the persisted start preference once the multiplayer session is ready.</summary>
@@ -409,21 +411,26 @@ public sealed class ModEntry : Mod
             playerId.HasValue ? new[] { playerId.Value } : null);
     }
 
-    private void OnWallOcclusionMessageReceived(object? sender, ModMessageReceivedEventArgs e)
+    private void RequestWallOcclusion()
     {
-        if (!Context.IsWorldReady || !Context.IsMultiplayer || Context.IsMainPlayer)
+        if (Context.IsMainPlayer || !this.IsMultiplayerWorld())
             return;
 
         long hostPlayerId = Game1.MasterPlayer?.UniqueMultiplayerID ?? 0L;
-        if (!WallOcclusionSync.ShouldApplyFromHost(
-            Context.IsMainPlayer,
-            e.FromPlayerID,
-            hostPlayerId,
-            e.FromModID,
-            e.Type))
-        {
+        this.Helper.Multiplayer.SendMessage(
+            new WallOcclusionMessage { Request = true },
+            ModConstants.WallOcclusionMessageType,
+            new[] { ModConstants.ModId },
+            hostPlayerId != 0L ? new[] { hostPlayerId } : null);
+    }
+
+    private void OnWallOcclusionMessageReceived(object? sender, ModMessageReceivedEventArgs e)
+    {
+        if (!Context.IsWorldReady || !Context.IsMultiplayer)
             return;
-        }
+
+        if (!WallOcclusionSync.IsSettingsMessage(e.FromModID, e.Type))
+            return;
 
         WallOcclusionMessage? message;
         try
@@ -438,6 +445,37 @@ public sealed class ModEntry : Mod
 
         if (message is null)
             return;
+
+        if (Context.IsMainPlayer)
+        {
+            long localPlayerId = Game1.player?.UniqueMultiplayerID ?? 0L;
+            if (WallOcclusionSync.ShouldReplyToRequest(
+                isMainPlayer: true,
+                e.FromPlayerID,
+                localPlayerId,
+                e.FromModID,
+                e.Type,
+                message.Request))
+            {
+                this.SendWallOcclusion(e.FromPlayerID);
+            }
+
+            return;
+        }
+
+        if (message.Request)
+            return;
+
+        long hostPlayerId = Game1.MasterPlayer?.UniqueMultiplayerID ?? 0L;
+        if (!WallOcclusionSync.ShouldApplyFromHost(
+            Context.IsMainPlayer,
+            e.FromPlayerID,
+            hostPlayerId,
+            e.FromModID,
+            e.Type))
+        {
+            return;
+        }
 
         this._effectiveWallOcclusion = message.Enabled;
         this.Monitor.Log($"Host wall occlusion: {(message.Enabled ? "enabled" : "disabled")}.", LogLevel.Info);
