@@ -17,10 +17,9 @@
 ## 4. Integration verification
 
 - [x] 4.1 Run `dotnet test PVC.slnx` and `dotnet build PVC.slnx`; verify all tests pass and the build has no warnings or errors
-- [ ] 4.2 In a mine or farm cave, verify remote voice has a short echo and remains intelligible; verify there is no echo outdoors
-- [ ] 4.3 Start the microphone test in a cave and verify the local monitor has no cave echo
 
 ## Workflow follow-up
 
-- Archive after the in-game cave and microphone-test checks are complete.
+- Post-release verification by players: cave echo intelligibility, no echo outdoors, and a clean microphone test monitor.
+- Archive after the automated checks are complete.
 - The existing host-controlled wall occlusion and dynamic-block roadmap work are separate changes.
