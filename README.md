@@ -152,9 +152,10 @@ Three gates are applied to every incoming packet:
    voice completely. Open or passable doors on the map layer do not block, while closed doors do.
    Player-placed objects, trees and furniture are not considered yet.
 
-In mines and farm caves, the cave environment also makes incoming voice quieter and more muffled.
-That environment effect is independent of `WallOcclusion` and applies even when wall occlusion is
-disabled by the host.
+In mines and farm caves, incoming voice gets a short echo/reverb and a mild attenuation, so the
+cave sounds enclosed and immersive instead of just quieter. The cave echo is independent of
+`WallOcclusion` and applies even when wall occlusion is disabled by the host. The local microphone
+test monitor stays clean; the echo is only applied to remote voice playback.
 
 The listener's own configured radius does not gate incoming voice. It is the local player's
 outgoing reach, so changing it changes how far others can hear you, not how far you hear them.
@@ -239,6 +240,8 @@ put the path in `~/stardewvalley.targets`:
   without the mod are silently inaudible.
 - **Voice sounds muffled or very quiet near a building** — static walls are occluding the speaker.
   Move to the same side of the wall or ask the host to disable `WallOcclusion`.
+- **Voice has a short echo in a mine or farm cave** — that is the cave environment effect. It stays
+  active even if the host disables `WallOcclusion`; the local microphone test monitor is not echoed.
 - **Feedback during the microphone test** — turn off **Monitor microphone during test**, lower
   `PlaybackVolume`, or use headphones before enabling monitoring.
 - **Generic Mod Config Menu missing** — the mod still works and reads `config.json`; install GMCM
