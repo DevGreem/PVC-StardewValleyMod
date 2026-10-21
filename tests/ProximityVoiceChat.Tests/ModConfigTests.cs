@@ -22,7 +22,7 @@ public class ModConfigTests
         Assert.Equal("", config.OutputDeviceName);
         Assert.Equal(100, config.PlaybackVolume);
         Assert.True(config.WallOcclusion);
-        Assert.Equal(10, config.ProximityRadius);
+        Assert.Equal(15, config.ProximityRadius);
         Assert.Equal(ActivationMode.VoiceActivity, config.ActivationMode);
         Assert.Equal(50, config.VoiceSensitivity);
         Assert.False(config.StartMicrophoneEnabled);
@@ -45,7 +45,7 @@ public class ModConfigTests
             OutputDeviceName = "Speakers (USB)",
             PlaybackVolume = 65,
             WallOcclusion = false,
-            ProximityRadius = 20,
+            ProximityRadius = 30,
             ActivationMode = ActivationMode.PushToTalk,
             VoiceSensitivity = 15,
             StartMicrophoneEnabled = true,
@@ -176,7 +176,7 @@ public class ModConfigTests
         Assert.Equal("", config.OutputDeviceName);
         Assert.Equal(100, config.PlaybackVolume);
         Assert.True(config.WallOcclusion);
-        Assert.Equal(10, config.ProximityRadius);
+        Assert.Equal(15, config.ProximityRadius);
         Assert.Equal(0, config.VoiceSensitivity);
         Assert.Equal("V", config.PushToTalkKey);
         Assert.Equal("F7", config.MicrophoneToggleKey);
@@ -207,6 +207,24 @@ public class ModConfigTests
     }
 
     [Fact]
+    public void Normalize_SanitizesPersistedMutedPlayerNames()
+    {
+        ModConfig config = new()
+        {
+            MutedPlayers =
+            {
+                new MutedPlayer { PlayerId = 10, PlayerName = "A\nB" },
+                new MutedPlayer { PlayerId = 20, PlayerName = new string('x', 40) }
+            }
+        };
+
+        config.Normalize();
+
+        Assert.Equal("AB", config.MutedPlayers[0].PlayerName);
+        Assert.Equal(new string('x', PlayerNameSanitizer.MaxVisibleLength), config.MutedPlayers[1].PlayerName);
+    }
+
+    [Fact]
     public void Normalize_MovesTestKeyWhenItCollidesWithMicrophoneToggle()
     {
         ModConfig config = new()
@@ -233,21 +251,27 @@ public class ModConfigTests
     }
 
     [Theory]
-    [InlineData(6)]
-    [InlineData(15)]
-    public void Normalize_MapsLegacyRadiiToDefault(int legacyRadius)
+    [InlineData(3, 3)]
+    [InlineData(6, 3)]
+    [InlineData(10, 15)]
+    [InlineData(15, 15)]
+    [InlineData(20, 30)]
+    [InlineData(30, 30)]
+    [InlineData(999, 15)]
+    public void Normalize_MapsLegacyRadiiToTheirTier(int legacyRadius, int expected)
     {
         ModConfig config = new() { ProximityRadius = legacyRadius };
 
         config.Normalize();
 
-        Assert.Equal(ModConstants.DefaultProximityRadius, config.ProximityRadius);
+        Assert.Equal(expected, config.ProximityRadius);
     }
 
     [Theory]
-    [InlineData(6)]
-    [InlineData(15)]
-    public void Deserialize_LegacyRadiusNormalizesToDefault(int legacyRadius)
+    [InlineData(6, 3)]
+    [InlineData(10, 15)]
+    [InlineData(20, 30)]
+    public void Deserialize_LegacyRadiusNormalizesToItsTier(int legacyRadius, int expected)
     {
         string json = $$"""{"ProximityRadius": {{legacyRadius}}}""";
 
@@ -255,40 +279,44 @@ public class ModConfigTests
 
         Assert.NotNull(config);
         config!.Normalize();
-        Assert.Equal(ModConstants.DefaultProximityRadius, config.ProximityRadius);
+        Assert.Equal(expected, config.ProximityRadius);
     }
 
     [Fact]
-    public void Deserialize_Radius20RemainsValid()
+    public void Deserialize_Radius30RemainsValid()
     {
-        const string json = """{"ProximityRadius": 20}""";
+        const string json = """{"ProximityRadius": 30}""";
 
         ModConfig? config = JsonSerializer.Deserialize<ModConfig>(json, Options);
 
         Assert.NotNull(config);
         config!.Normalize();
-        Assert.Equal(20, config.ProximityRadius);
+        Assert.Equal(30, config.ProximityRadius);
     }
 
     [Fact]
     public void NextRadius_CyclesThroughOfferedSet()
     {
-        Assert.Equal(10, ModConfig.NextRadius(3));
-        Assert.Equal(20, ModConfig.NextRadius(10));
-        Assert.Equal(3, ModConfig.NextRadius(20));
-        Assert.Equal(10, ModConfig.NextRadius(999));
+        Assert.Equal(15, ModConfig.NextRadius(3));
+        Assert.Equal(30, ModConfig.NextRadius(15));
+        Assert.Equal(3, ModConfig.NextRadius(30));
+        Assert.Equal(15, ModConfig.NextRadius(999));
     }
 
     [Fact]
     public void OfferedSet_IsClosedAndAscending()
     {
-        Assert.Equal(new[] { 3, 10, 20 }, ModConstants.ProximityRadii);
+        Assert.Equal(new[] { 3, 15, 30 }, ModConstants.ProximityRadii);
         for (int i = 1; i < ModConstants.ProximityRadii.Length; i++)
             Assert.True(ModConstants.ProximityRadii[i] > ModConstants.ProximityRadii[i - 1]);
 
         Assert.True(ModConfig.IsOfferedRadius(ModConstants.DefaultProximityRadius));
         Assert.False(ModConfig.IsOfferedRadius(ModConstants.DefaultProximityRadius + 1));
         Assert.False(ModConfig.IsOfferedRadius(6));
-        Assert.False(ModConfig.IsOfferedRadius(15));
+        Assert.True(ModConfig.IsOfferedRadius(15));
+        Assert.True(ModConfig.IsLegacyRadius(6));
+        Assert.True(ModConfig.IsLegacyRadius(10));
+        Assert.True(ModConfig.IsLegacyRadius(20));
+        Assert.False(ModConfig.IsLegacyRadius(25));
     }
 }

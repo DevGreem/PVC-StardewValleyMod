@@ -25,6 +25,10 @@
     <None Remove="tests/**/*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="assets/muted-mic.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Restore all native PortAudio runtimes so the build can package every platform. -->
   <ItemGroup>
     <PackageReference Include="org.k2fsa.portaudio.runtime.win-x64" Version="1.0.6" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />

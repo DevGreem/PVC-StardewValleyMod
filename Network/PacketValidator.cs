@@ -15,7 +15,8 @@ public static class PacketValidator
             return false;
         }
 
-        if (!ModConfig.IsOfferedRadius(packet.ProximityRadius))
+        if (!ModConfig.IsOfferedRadius(packet.ProximityRadius)
+            && !ModConfig.IsLegacyRadius(packet.ProximityRadius))
         {
             error = $"unsupported proximity radius {packet.ProximityRadius}";
             return false;
