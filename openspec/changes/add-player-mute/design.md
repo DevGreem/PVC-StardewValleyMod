@@ -46,12 +46,13 @@ If a player is muted, `UpdateSpeakerState` forces the channel volume to zero and
 
 Add `PlayerMuteMenu : IClickableMenu`, opened by `PlayerMuteKey` (default `F10`). It has two views:
 
-- **Nearby:** `Game1.otherFarmers` in the same location and within the local player's configured voice reach. This is the same convenience radius shown in the HUD, not a separate audibility rule.
-- **All:** every current `Game1.otherFarmers` entry except the local player, with location and mute state.
+- **Nearby:** `Game1.otherFarmers` in the same location and within the voice reach declared by each other player. The local player's outgoing reach controls only how far their own voice carries, so it must not filter who can be muted. The declared reach is learned from accepted voice packets and remembered for the session; until it is known, the maximum offered reach (20 tiles) is used.
+- **All:** every current `Game1.otherFarmers` entry except the local player, with location, own reach and mute state.
 
-Each row shows the name, location and a clear muted/unmuted state. Clicking a row toggles the mute and calls `SaveConfig` immediately. The menu rebuilds its rows when opened and when the player list changes; it does not open in single-player or on top of another menu.
+Each row shows the name, location, own voice reach and a clear muted/unmuted state. Clicking a row toggles the mute and calls `SaveConfig` immediately. The menu rebuilds its rows when opened and when the player list changes; it does not open in single-player or on top of another menu.
 
-- **Why:** one menu satisfies both requests without making the HUD capture game clicks.
+- **Why:** one menu satisfies both requests without making the HUD capture game clicks, and using the speaker's reach matches how incoming voice actually works.
+- **Alternative rejected:** filtering by the local player's reach hides distant-but-audible players and forces a trip to All.
 - **Alternative rejected:** GMCM cannot render a dynamic list with the current API subset.
 - **Alternative rejected:** clickable HUD rows would require hitboxes, mouse suppression and careful interaction with the game's UI; the menu is safer and more discoverable.
 
@@ -89,7 +90,7 @@ GMCM does not list players; the paragraph points to the menu.
 
 - `PlayerMuteList` tests: add, remove, toggle, duplicate handling, lookup by ID and reset.
 - `ModConfig` tests: default empty list, serialization round-trip, normalization of duplicates/invalid IDs and reset.
-- Menu-model tests: Nearby filters by location and distance; All includes players in other locations; rows are sorted and carry the mute state.
+- Menu-model tests: Nearby filters by location and each player's declared reach; All includes players in other locations; rows are sorted and carry the reach and mute state.
 - Indicator tests: a nearby muted player is considered for the HUD even when silent, while an out-of-range muted player is not.
 - Manual checks: mute/unmute from Nearby, mute someone from All, restart persistence, muted player still hears the local player, the muted nearby player remains visible with the icon even while silent, and the HUD remains click-through.
 

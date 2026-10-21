@@ -24,6 +24,7 @@ public sealed class ModEntry : Mod
     private readonly List<SpeakerChannel> _speakerScratch = new();
     private readonly List<HudSpeaker> _hudSpeakers = new();
     private readonly HashSet<long> _hudSpeakerIds = new();
+    private readonly Dictionary<long, int> _knownVoiceReach = new();
     private readonly LocalMonitorSource _testMonitorSource = new();
 
     private ModConfig _config = new();
@@ -216,6 +217,7 @@ public sealed class ModEntry : Mod
         this._capture.ResetSession();
         this._audio.StopCapture();
         this._transport.ReleaseAll();
+        this._knownVoiceReach.Clear();
         this.ClearSpeakers();
 
         this._effectiveWallOcclusion = WallOcclusionSync.ResolveEffective(
@@ -276,6 +278,7 @@ public sealed class ModEntry : Mod
         this._audio.StopCapture();
         this._audio.StopPlayback();
         this._transport.ReleaseAll();
+        this._knownVoiceReach.Clear();
         this.ClearSpeakers();
 
         this._effectiveWallOcclusion = true;
@@ -413,7 +416,6 @@ public sealed class ModEntry : Mod
             return;
 
         Game1.activeClickableMenu = new PlayerMuteMenu(
-            this._config,
             this.BuildPlayerMuteCandidates,
             this.TogglePlayerMute);
         Game1.playSound("bigSelect");
@@ -427,16 +429,22 @@ public sealed class ModEntry : Mod
 
         foreach (Farmer farmer in Game1.otherFarmers.Values)
         {
-            if (farmer.UniqueMultiplayerID == Game1.player.UniqueMultiplayerID)
+            long playerId = farmer.UniqueMultiplayerID;
+            if (playerId == Game1.player.UniqueMultiplayerID)
                 continue;
 
+            int voiceReach = this._knownVoiceReach.TryGetValue(playerId, out int knownReach)
+                ? knownReach
+                : ModConstants.ProximityRadii[ModConstants.ProximityRadii.Length - 1];
+
             players.Add(new PlayerMuteCandidate(
-                farmer.UniqueMultiplayerID,
+                playerId,
                 farmer.Name,
                 farmer.currentLocation?.NameOrUniqueName ?? "",
                 (int)farmer.Tile.X,
                 (int)farmer.Tile.Y,
-                this._mutes.IsMuted(farmer.UniqueMultiplayerID)));
+                voiceReach,
+                this._mutes.IsMuted(playerId)));
         }
 
         return players;
@@ -559,6 +567,8 @@ public sealed class ModEntry : Mod
         if (!Game1.otherFarmers.TryGetValue(playerId, out Farmer? farmer) || farmer?.currentLocation is null)
             return;
 
+        this._knownVoiceReach[playerId] = packet.ProximityRadius;
+
         string localLocation = Game1.player.currentLocation?.NameOrUniqueName ?? "";
         string speakerLocation = farmer.currentLocation.NameOrUniqueName;
         if (!ProximityMath.IsSameLocation(localLocation, speakerLocation))
@@ -576,6 +586,8 @@ public sealed class ModEntry : Mod
 
     private void OnPeerLost(long playerId)
     {
+        this._knownVoiceReach.Remove(playerId);
+
         if (this._speakers.TryRemove(playerId, out SpeakerChannel? channel))
         {
             channel.Volume = 0f;

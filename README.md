@@ -83,15 +83,16 @@ Headphones are strongly recommended before enabling monitoring.
 
 Press `F10` (or the configured player-mute key) to open the local player menu. It has two views:
 
-- **Nearby:** players in the same game location within your active voice reach.
+- **Nearby:** players in the same game location within the voice reach declared by **that player**,
+  so someone with a 20-tile reach appears even if your own reach is only 3.
 - **All:** every player currently in the server, regardless of location or distance.
 
-Click a player row to mute or unmute that player. Mutes are **local**: they silence that player
-only on your machine, while everyone else continues to hear them. The list is saved in your
-config and persists across sessions. A muted player who is nearby still appears in the HUD with
-a muted-microphone icon, even while they are silent, so you can see who you have silenced. The
-HUD stays click-through; the menu is the interactive surface. Resetting the settings clears the
-mute list.
+Click a player row to mute or unmute that player. Each row shows the player's own voice reach.
+Mutes are **local**: they silence that player only on your machine, while everyone else continues
+to hear them. The list is saved in your config and persists across sessions. A muted player who
+is nearby still appears in the HUD with a muted-microphone icon, even while they are silent, so
+you can see who you have silenced. The HUD stays click-through; the menu is the interactive
+surface. Resetting the settings clears the mute list.
 
 ## Settings
 

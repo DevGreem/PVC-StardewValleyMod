@@ -11,8 +11,7 @@ public static class PlayerMuteMenuModel
         string localLocation,
         int localTileX,
         int localTileY,
-        bool nearbyOnly,
-        int reach)
+        bool nearbyOnly)
     {
         List<PlayerMuteRow> rows = new();
         foreach (PlayerMuteCandidate player in players)
@@ -23,7 +22,7 @@ public static class PlayerMuteMenuModel
                 if (!string.Equals(player.Location, localLocation, StringComparison.Ordinal))
                     continue;
 
-                if (distance > reach)
+                if (distance >= player.VoiceReach)
                     continue;
             }
 
@@ -31,6 +30,7 @@ public static class PlayerMuteMenuModel
                 player.PlayerId,
                 player.Name,
                 player.Location,
+                player.VoiceReach,
                 player.IsMuted,
                 distance));
         }

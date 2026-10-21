@@ -51,12 +51,17 @@ The mod SHALL store the local player's mute list in the local config, keyed by `
 
 ### Requirement: Nearby player menu
 
-The mod SHALL provide a player-mute menu opened by a configurable keybind, with a Nearby view listing players in the same game location within the local player's active voice reach. Each row SHALL show the player name, location and mute state, and selecting a row SHALL toggle that player's mute and save the config.
+The mod SHALL provide a player-mute menu opened by a configurable keybind, with a Nearby view listing players in the same game location within the voice reach declared by each player. The local player's own outgoing reach SHALL NOT filter this view. Until a player's reach is known, the view SHALL use the maximum offered reach as a fallback. Each row SHALL show the player name, location, own voice reach and mute state, and selecting a row SHALL toggle that player's mute and save the config.
 
 #### Scenario: Nearby view
 
 - **WHEN** the menu opens on the Nearby view
-- **THEN** it lists only players in the local location within the active voice reach
+- **THEN** it lists only players in the local location within the reach declared by each of those players
+
+#### Scenario: Different voice reaches
+
+- **WHEN** another player has a 20-tile reach and the local player has a 3-tile reach
+- **THEN** the other player appears in Nearby while within their own 20-tile reach
 
 #### Scenario: Toggle from the menu
 
