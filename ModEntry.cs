@@ -686,7 +686,8 @@ public sealed class ModEntry : Mod
                 : StringComparer.OrdinalIgnoreCase.Compare(first.Name, second.Name);
         });
 
-        int speakerCount = Math.Min(this._hudSpeakers.Count, 8);
+        int speakerCount = IndicatorRules.GetVisibleCount(this._hudSpeakers.Count);
+        int hiddenSpeakerCount = IndicatorRules.GetHiddenCount(this._hudSpeakers.Count);
         VoiceIndicatorSpeaker[] speakers = new VoiceIndicatorSpeaker[speakerCount];
         for (int i = 0; i < speakerCount; i++)
             speakers[i] = new VoiceIndicatorSpeaker(this._hudSpeakers[i].Name, this._hudSpeakers[i].IsMuted);
@@ -697,7 +698,8 @@ public sealed class ModEntry : Mod
             this._capture.IsTransmittingNow,
             this._config.ActivationMode,
             this._config.ProximityRadius,
-            speakers);
+            speakers,
+            hiddenSpeakerCount);
     }
 
     private void AddHudSpeaker(long playerId, string name, bool isMuted, double distanceTiles)
