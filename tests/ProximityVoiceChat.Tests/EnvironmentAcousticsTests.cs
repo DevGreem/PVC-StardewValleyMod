@@ -14,6 +14,7 @@ public class EnvironmentAcousticsTests
     [Fact]
     public void ApplyGain_ReducesCaveVolume()
     {
+        Assert.Equal(0.80f, EnvironmentAcoustics.CaveGain, 3);
         Assert.Equal(0.6f * EnvironmentAcoustics.CaveGain, EnvironmentAcoustics.ApplyGain(0.6f, inCave: true), 3);
     }
 
@@ -26,7 +27,8 @@ public class EnvironmentAcousticsTests
     [Fact]
     public void ApplyLowPassAlpha_CapsCaveMuffling()
     {
-        Assert.Equal(EnvironmentAcoustics.CaveLowPassAlpha, EnvironmentAcoustics.ApplyLowPassAlpha(0.55f, inCave: true), 3);
+        Assert.Equal(0.55f, EnvironmentAcoustics.CaveLowPassAlpha, 3);
+        Assert.Equal(EnvironmentAcoustics.CaveLowPassAlpha, EnvironmentAcoustics.ApplyLowPassAlpha(0.80f, inCave: true), 3);
         Assert.Equal(0.10f, EnvironmentAcoustics.ApplyLowPassAlpha(0.10f, inCave: true), 3);
     }
 }
