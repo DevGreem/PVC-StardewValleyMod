@@ -125,9 +125,7 @@ public sealed class ModConfig
             if (player == null || player.PlayerId <= 0 || !seenPlayers.Add(player.PlayerId))
                 continue;
 
-            string name = string.IsNullOrWhiteSpace(player.PlayerName)
-                ? $"Player {player.PlayerId}"
-                : player.PlayerName.Trim();
+            string name = PlayerNameSanitizer.Sanitize(player.PlayerName, player.PlayerId);
             normalizedPlayers.Add(new MutedPlayer { PlayerId = player.PlayerId, PlayerName = name });
         }
 

@@ -207,6 +207,24 @@ public class ModConfigTests
     }
 
     [Fact]
+    public void Normalize_SanitizesPersistedMutedPlayerNames()
+    {
+        ModConfig config = new()
+        {
+            MutedPlayers =
+            {
+                new MutedPlayer { PlayerId = 10, PlayerName = "A\nB" },
+                new MutedPlayer { PlayerId = 20, PlayerName = new string('x', 40) }
+            }
+        };
+
+        config.Normalize();
+
+        Assert.Equal("AB", config.MutedPlayers[0].PlayerName);
+        Assert.Equal(new string('x', PlayerNameSanitizer.MaxVisibleLength), config.MutedPlayers[1].PlayerName);
+    }
+
+    [Fact]
     public void Normalize_MovesTestKeyWhenItCollidesWithMicrophoneToggle()
     {
         ModConfig config = new()

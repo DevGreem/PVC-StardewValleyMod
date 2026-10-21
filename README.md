@@ -128,8 +128,14 @@ list.
 
 The radius is the local player's **outgoing voice reach**: it controls how far other players can
 hear you, not how far you hear them. Each speaker's own radius decides what you hear from them.
-Choose `3` for a private conversation, `10` for normal conversation or `20` for long range.
+Choose `3` for a quiet conversation, `10` for normal conversation or `20` for long range.
 Config files from older builds containing `6` or `15` are normalized to `10` on load.
+
+Proximity is a playback rule, not a confidentiality boundary. Honest clients address outgoing
+voice only to peers in the same location and inside the declared reach, but a modified client can
+still send voice to every peer, and the host can inspect session traffic. SMAPI does not
+authenticate the sender ID, so voice attribution and local mute are advisory rather than
+cryptographic guarantees.
 
 Config files created by older builds do not contain `StartMicrophoneEnabled`, `MicrophoneTestKey`,
 `MicrophoneTestMonitor`, `WallOcclusion`, `PlayerMuteKey` or `MutedPlayers`; they load as `false`,
@@ -162,7 +168,7 @@ also shows the key that stops the test.
 Three gates are applied to every incoming packet:
 
 1. **Same location.** The speaker's current game location must match the local player's. No voice
-   crosses between the farm, the town, a mine level or a building interior.
+   is played across the farm, the town, a mine level or a building interior.
 2. **Distance.** The speaker declares their voice reach in each packet. Inside that radius, volume
    falls off linearly: full volume next to the player, silence at the radius. The closest speakers
    are mixed first when more than eight are in range at once.

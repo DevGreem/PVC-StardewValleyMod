@@ -7,6 +7,12 @@ using Xunit;
 public class VoicePacketTests
 {
     [Fact]
+    public void MaxEncodedBase64Chars_CoversTheLargestValidPacket()
+    {
+        Assert.Equal(492, VoicePacket.MaxEncodedBase64Chars);
+    }
+
+    [Fact]
     public void RoundTrip_PreservesEveryField()
     {
         byte[] audio = { 1, 2, 3, 4, 5, 250 };

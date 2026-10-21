@@ -25,6 +25,7 @@ public sealed class ModEntry : Mod
     private readonly List<HudSpeaker> _hudSpeakers = new();
     private readonly HashSet<long> _hudSpeakerIds = new();
     private readonly Dictionary<long, int> _knownVoiceReach = new();
+    private readonly RateLimiter _wallOcclusionLimiter = new(10);
     private readonly LocalMonitorSource _testMonitorSource = new();
 
     private ModConfig _config = new();
@@ -301,7 +302,9 @@ public sealed class ModEntry : Mod
             this.Monitor.Log("Update tick hook active.", LogLevel.Trace);
         }
 
-        this._pushToTalkHeld = this.IsMultiplayerWorld() && this.Helper.Input.IsDown(this._pushToTalkKey);
+        this._pushToTalkHeld = this.IsMultiplayerWorld()
+            && !IsTextInputActive()
+            && this.Helper.Input.IsDown(this._pushToTalkKey);
         this._capture.PushToTalkHeld = this._pushToTalkHeld;
         this.UpdateCaptureSettings();
 
@@ -361,6 +364,9 @@ public sealed class ModEntry : Mod
 
     private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
     {
+        if (IsTextInputActive())
+            return;
+
         if (e.Button == this._playerMuteKey)
         {
             this.OpenPlayerMuteMenu();
@@ -448,7 +454,7 @@ public sealed class ModEntry : Mod
 
             players.Add(new PlayerMuteCandidate(
                 playerId,
-                farmer.Name,
+                PlayerNameSanitizer.Sanitize(farmer.Name, playerId),
                 farmer.currentLocation?.NameOrUniqueName ?? "",
                 (int)farmer.Tile.X,
                 (int)farmer.Tile.Y,
@@ -461,9 +467,10 @@ public sealed class ModEntry : Mod
 
     private void TogglePlayerMute(long playerId, string playerName)
     {
-        this._mutes.Toggle(this._config, playerId, playerName);
+        string safeName = PlayerNameSanitizer.Sanitize(playerName, playerId);
+        this._mutes.Toggle(this._config, playerId, safeName);
         this.SaveConfig();
-        this.Monitor.Log($"Player {playerName} is now {(this._mutes.IsMuted(playerId) ? "muted" : "unmuted")} locally.", LogLevel.Info);
+        this.Monitor.Log($"Player {safeName} is now {(this._mutes.IsMuted(playerId) ? "muted" : "unmuted")} locally.", LogLevel.Info);
     }
 
     private void OnPeerDisconnected(object? sender, PeerDisconnectedEventArgs e)
@@ -508,6 +515,11 @@ public sealed class ModEntry : Mod
             return;
 
         if (!WallOcclusionSync.IsSettingsMessage(e.FromModID, e.Type))
+            return;
+
+        // Settings messages are rare; a global budget prevents a peer from making
+        // the host parse and answer an unbounded request flood.
+        if (!this._wallOcclusionLimiter.TryAcquire(GetTimestampSeconds()))
             return;
 
         WallOcclusionMessage? message;
@@ -587,8 +599,9 @@ public sealed class ModEntry : Mod
         // the packet, so a speaker can shrink their reach and be updated immediately.
         float distance = Vector2.Distance(farmer.Tile, Game1.player.Tile);
 
-        SpeakerChannel channel = this._speakers.GetOrAdd(playerId, _ => new SpeakerChannel(playerId, farmer.Name));
-        channel.PlayerName = farmer.Name;
+        string safeName = PlayerNameSanitizer.Sanitize(farmer.Name, playerId);
+        SpeakerChannel channel = this._speakers.GetOrAdd(playerId, _ => new SpeakerChannel(playerId, safeName));
+        channel.PlayerName = safeName;
         channel.DistanceTiles = distance;
         channel.Receive(packet, GetTimestampSeconds(), enqueueAudio: !this._mutes.IsMuted(playerId));
     }
@@ -661,7 +674,7 @@ public sealed class ModEntry : Mod
                 if (!ProximityMath.IsInRange(distance, reach))
                     continue;
 
-                this.AddHudSpeaker(playerId, farmer.Name, isMuted: true, distanceTiles: distance);
+                this.AddHudSpeaker(playerId, PlayerNameSanitizer.Sanitize(farmer.Name, playerId), isMuted: true, distanceTiles: distance);
             }
         }
 
@@ -943,6 +956,11 @@ public sealed class ModEntry : Mod
         this._microphoneTestKey = KeybindUtil.Parse(this._config.MicrophoneTestKey, SButton.F9);
         this._cycleRadiusKey = KeybindUtil.Parse(this._config.CycleRadiusKey, SButton.F8);
         this._playerMuteKey = KeybindUtil.Parse(this._config.PlayerMuteKey, SButton.F10);
+    }
+
+    private static bool IsTextInputActive()
+    {
+        return Game1.chatBox?.isActive() == true;
     }
 
     private bool IsMultiplayerWorld()
