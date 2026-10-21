@@ -1,0 +1,127 @@
+# Spec Delta
+
+## Purpose
+
+Turns received voice frames back into audible speech, with volume driven by how far away each speaker stands, so that talking to a nearby farmer feels local and talking across the map does not happen at all.
+
+## ADDED Requirements
+
+### Requirement: Same-location gating
+
+The mod SHALL play voice only from players who are in the same game location as the local player.
+
+#### Scenario: Speaker is in another location
+
+- **WHEN** voice arrives from a player who is in a different game location
+- **THEN** no audio is played for it
+
+#### Scenario: Speaker leaves the location mid-sentence
+
+- **WHEN** a player who was being heard walks out of the local player's location
+- **THEN** their voice stops
+
+### Requirement: Volume falls off with distance
+
+The mod SHALL reduce a speaker's playback volume as the distance in tiles between that speaker and the local player grows, and SHALL reach silence at the configured proximity radius.
+
+#### Scenario: Speaker is close by
+
+- **WHEN** the speaker stands next to the local player
+- **THEN** their voice plays at the full configured volume
+
+#### Scenario: Speaker is at the edge of the radius
+
+- **WHEN** the speaker is at or beyond the configured proximity radius
+- **THEN** their voice is silent
+
+#### Scenario: Speaker walks away while talking
+
+- **WHEN** the speaker moves from close by to the edge of the radius
+- **THEN** their voice gets progressively quieter
+
+### Requirement: Master playback volume
+
+The mod SHALL apply the configured master playback volume to all incoming voice.
+
+#### Scenario: Playback volume set to zero
+
+- **WHEN** the player sets the playback volume to zero
+- **THEN** no incoming voice is audible while everything else in the game is unaffected
+
+### Requirement: Concurrent speakers are mixed
+
+The mod SHALL play all in-range speakers simultaneously, and SHALL bound how many voices it mixes at once so that a crowded location cannot overload the audio pipeline.
+
+#### Scenario: Several players speak at once
+
+- **WHEN** multiple in-range players speak at the same time
+- **THEN** all of them are heard together
+
+#### Scenario: More speakers than the mod mixes at once
+
+- **WHEN** more in-range players speak at once than the mod mixes simultaneously
+- **THEN** the closest speakers are heard and the rest are left out for that moment
+
+### Requirement: Overlapping voices do not clip
+
+The mod SHALL keep the mixed output within the audible range when several voices overlap, rather than clipping.
+
+#### Scenario: Many loud voices overlap
+
+- **WHEN** several loud voices are mixed at the same time
+- **THEN** the result stays within the audible range and does not clip
+
+### Requirement: Playback absorbs packet loss and jitter
+
+The mod SHALL buffer incoming voice so that short network jitter or a single lost packet does not produce an audible gap.
+
+#### Scenario: A single packet is lost
+
+- **WHEN** one voice packet never arrives
+- **THEN** that speaker's audio continues without a noticeable break
+
+#### Scenario: Packets arrive unevenly
+
+- **WHEN** packets arrive with varying delay
+- **THEN** playback stays continuous
+
+### Requirement: Playback survives game hitches
+
+The mod SHALL keep playing incoming voice while the game itself is busy.
+
+#### Scenario: The game stutters or autosaves
+
+- **WHEN** the game hitches, pauses or autosaves while another player is speaking
+- **THEN** that player's voice keeps playing
+
+### Requirement: Decoding failures do not interrupt playback
+
+The mod SHALL discard a frame it cannot decode and continue playing that speaker's later frames.
+
+#### Scenario: A frame fails to decode
+
+- **WHEN** a received frame cannot be decoded
+- **THEN** it is skipped and playback continues with the next frame
+
+### Requirement: Output device selection
+
+The mod SHALL play incoming voice through the player's selected output device, falling back to the system default output device when no valid device is selected.
+
+#### Scenario: No output device chosen
+
+- **WHEN** the player has not chosen an output device
+- **THEN** the system default output device is used
+
+#### Scenario: Selected output device disappears
+
+- **WHEN** the previously selected output device is no longer present
+- **THEN** the mod falls back to the system default and reports the substitution
+
+### Requirement: No playback outside a multiplayer world
+
+The mod SHALL NOT play incoming voice when no multiplayer world is loaded or after the player returns to the title screen.
+
+#### Scenario: Returning to the title screen
+
+- **WHEN** the player leaves the world
+- **THEN** no incoming voice is played
