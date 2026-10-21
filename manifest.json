@@ -1,0 +1,10 @@
+{
+  "Name": "Proximity Voice Chat",
+  "Author": "Greem",
+  "Version": "0.1.0",
+  "Description": "In-game proximity voice chat for Stardew Valley multiplayer. No Discord, no bots: install the mod and talk.",
+  "UniqueID": "Greem.ProximityVoiceChat",
+  "EntryDll": "ProximityVoiceChat.dll",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": []
+}
