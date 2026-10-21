@@ -21,9 +21,9 @@ public static class ModConstants
     public const int StaleChannelMilliseconds = 5000;
 
     /// <summary>The closed set of voice-reach radii offered to players, in tiles.</summary>
-    public static readonly int[] ProximityRadii = { 3, 10, 20 };
+    public static readonly int[] ProximityRadii = { 3, 15, 30 };
 
-    public const int DefaultProximityRadius = 10;
+    public const int DefaultProximityRadius = 15;
     public const int DefaultSensitivity = 50;
     public const int DefaultPlaybackVolume = 100;
 
