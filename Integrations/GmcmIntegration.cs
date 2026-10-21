@@ -165,6 +165,18 @@ public sealed class GmcmIntegration
             () => "Cycles through the offered proximity radii.",
             "cycle-radius-key");
 
+        api.AddKeybind(
+            manifest,
+            () => KeybindUtil.Parse(this._config.PlayerMuteKey, SButton.F10),
+            value => { this._config.PlayerMuteKey = KeybindUtil.Format(value); this._mod.OnConfigChanged(); },
+            () => "Player mute menu key",
+            () => "Opens the local player-mute menu.",
+            "player-mute-key");
+
+        api.AddParagraph(
+            manifest,
+            () => $"Mute players locally from the player menu ({this._config.PlayerMuteKey}). Mutes are saved and never affect other players.");
+
         api.AddSectionTitle(manifest, () => "Interface");
         api.AddBoolOption(
             manifest,

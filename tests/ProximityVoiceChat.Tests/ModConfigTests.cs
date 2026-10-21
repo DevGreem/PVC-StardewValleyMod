@@ -31,6 +31,8 @@ public class ModConfigTests
         Assert.Equal("F9", config.MicrophoneTestKey);
         Assert.False(config.MicrophoneTestMonitor);
         Assert.Equal("F8", config.CycleRadiusKey);
+        Assert.Equal("F10", config.PlayerMuteKey);
+        Assert.Empty(config.MutedPlayers);
         Assert.True(config.ShowIndicator);
     }
 
@@ -52,7 +54,12 @@ public class ModConfigTests
             MicrophoneTestKey = "F10",
             MicrophoneTestMonitor = true,
             CycleRadiusKey = "F9",
-            ShowIndicator = false
+            PlayerMuteKey = "F6",
+            ShowIndicator = false,
+            MutedPlayers =
+            {
+                new MutedPlayer { PlayerId = 123, PlayerName = "Alice" }
+            }
         };
 
         string json = JsonSerializer.Serialize(original, Options);
@@ -72,6 +79,10 @@ public class ModConfigTests
         Assert.Equal(original.MicrophoneTestKey, copy.MicrophoneTestKey);
         Assert.Equal(original.MicrophoneTestMonitor, copy.MicrophoneTestMonitor);
         Assert.Equal(original.CycleRadiusKey, copy.CycleRadiusKey);
+        Assert.Equal(original.PlayerMuteKey, copy.PlayerMuteKey);
+        Assert.Single(copy.MutedPlayers);
+        Assert.Equal(123, copy.MutedPlayers[0].PlayerId);
+        Assert.Equal("Alice", copy.MutedPlayers[0].PlayerName);
         Assert.Equal(original.ShowIndicator, copy.ShowIndicator);
     }
 
@@ -100,6 +111,8 @@ public class ModConfigTests
         Assert.True(config.WallOcclusion);
         Assert.Equal("F9", config.MicrophoneTestKey);
         Assert.False(config.MicrophoneTestMonitor);
+        Assert.Equal("F10", config.PlayerMuteKey);
+        Assert.Empty(config.MutedPlayers);
     }
 
     [Fact]
@@ -113,6 +126,23 @@ public class ModConfigTests
         Assert.True(config.WallOcclusion);
         Assert.Equal("F9", config.MicrophoneTestKey);
         Assert.False(config.MicrophoneTestMonitor);
+        Assert.Equal("F10", config.PlayerMuteKey);
+        Assert.Empty(config.MutedPlayers);
+    }
+
+    [Fact]
+    public void ResetToDefaults_ClearsMuteListAndRestoresKey()
+    {
+        ModConfig config = new()
+        {
+            PlayerMuteKey = "F6",
+            MutedPlayers = { new MutedPlayer { PlayerId = 42, PlayerName = "Alice" } }
+        };
+
+        config.ResetToDefaults();
+
+        Assert.Equal("F10", config.PlayerMuteKey);
+        Assert.Empty(config.MutedPlayers);
     }
 
     [Fact]
@@ -151,6 +181,29 @@ public class ModConfigTests
         Assert.Equal("V", config.PushToTalkKey);
         Assert.Equal("F7", config.MicrophoneToggleKey);
         Assert.Equal("not-a-key", config.CycleRadiusKey); // parsed with a fallback at runtime
+    }
+
+    [Fact]
+    public void Normalize_DeduplicatesAndRepairsMutedPlayers()
+    {
+        ModConfig config = new()
+        {
+            MutedPlayers =
+            {
+                new MutedPlayer { PlayerId = 0, PlayerName = "Invalid" },
+                new MutedPlayer { PlayerId = 10, PlayerName = " Alice " },
+                new MutedPlayer { PlayerId = 10, PlayerName = "Duplicate" },
+                new MutedPlayer { PlayerId = 20, PlayerName = "" }
+            }
+        };
+
+        config.Normalize();
+
+        Assert.Equal(2, config.MutedPlayers.Count);
+        Assert.Equal(10, config.MutedPlayers[0].PlayerId);
+        Assert.Equal("Alice", config.MutedPlayers[0].PlayerName);
+        Assert.Equal(20, config.MutedPlayers[1].PlayerId);
+        Assert.Equal("Player 20", config.MutedPlayers[1].PlayerName);
     }
 
     [Fact]

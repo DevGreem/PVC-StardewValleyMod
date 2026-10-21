@@ -61,8 +61,14 @@ public sealed class ModConfig
     /// <summary>Key that cycles the voice reach.</summary>
     public string CycleRadiusKey { get; set; } = "F8";
 
+    /// <summary>Key that opens the local player-mute menu.</summary>
+    public string PlayerMuteKey { get; set; } = "F10";
+
     /// <summary>Whether the on-screen voice indicator is drawn.</summary>
     public bool ShowIndicator { get; set; } = true;
+
+    /// <summary>Players muted locally by this config owner.</summary>
+    public List<MutedPlayer> MutedPlayers { get; set; } = new();
 
     /// <summary>Restore every persisted setting to its documented default.</summary>
     public void ResetToDefaults()
@@ -80,7 +86,9 @@ public sealed class ModConfig
         this.MicrophoneTestKey = "F9";
         this.MicrophoneTestMonitor = false;
         this.CycleRadiusKey = "F8";
+        this.PlayerMuteKey = "F10";
         this.ShowIndicator = true;
+        this.MutedPlayers = new();
     }
 
     /// <summary>Clamp or repair values loaded from disk so every consumer gets a valid config.</summary>
@@ -101,11 +109,29 @@ public sealed class ModConfig
         this.MicrophoneToggleKey = NormalizeKey(this.MicrophoneToggleKey, "F7");
         this.MicrophoneTestKey = NormalizeKey(this.MicrophoneTestKey, "F9");
         this.CycleRadiusKey = NormalizeKey(this.CycleRadiusKey, "F8");
+        this.PlayerMuteKey = NormalizeKey(this.PlayerMuteKey, "F10");
         this.MicrophoneTestKey = ResolveTestKeyConflict(
             this.MicrophoneTestKey,
             this.PushToTalkKey,
             this.MicrophoneToggleKey,
-            this.CycleRadiusKey);
+            this.CycleRadiusKey,
+            this.PlayerMuteKey);
+
+        this.MutedPlayers ??= new();
+        List<MutedPlayer> normalizedPlayers = new();
+        HashSet<long> seenPlayers = new();
+        foreach (MutedPlayer? player in this.MutedPlayers)
+        {
+            if (player == null || player.PlayerId <= 0 || !seenPlayers.Add(player.PlayerId))
+                continue;
+
+            string name = string.IsNullOrWhiteSpace(player.PlayerName)
+                ? $"Player {player.PlayerId}"
+                : player.PlayerName.Trim();
+            normalizedPlayers.Add(new MutedPlayer { PlayerId = player.PlayerId, PlayerName = name });
+        }
+
+        this.MutedPlayers = normalizedPlayers;
     }
 
     /// <summary>Get whether a radius belongs to the closed set the mod offers.</summary>
@@ -140,11 +166,12 @@ public sealed class ModConfig
     }
 
     /// <summary>Keep the test key distinct from the other PVC actions without changing their binds.</summary>
-    private static string ResolveTestKeyConflict(string testKey, string pushToTalk, string microphoneToggle, string cycleRadius)
+    private static string ResolveTestKeyConflict(string testKey, string pushToTalk, string microphoneToggle, string cycleRadius, string playerMute)
     {
         if (!Conflicts(testKey, pushToTalk)
             && !Conflicts(testKey, microphoneToggle)
-            && !Conflicts(testKey, cycleRadius))
+            && !Conflicts(testKey, cycleRadius)
+            && !Conflicts(testKey, playerMute))
         {
             return testKey;
         }
@@ -154,7 +181,8 @@ public sealed class ModConfig
         {
             if (!Conflicts(candidate, pushToTalk)
                 && !Conflicts(candidate, microphoneToggle)
-                && !Conflicts(candidate, cycleRadius))
+                && !Conflicts(candidate, cycleRadius)
+                && !Conflicts(candidate, playerMute))
             {
                 return candidate;
             }
