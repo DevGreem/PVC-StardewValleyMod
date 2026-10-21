@@ -11,19 +11,19 @@ public class OcclusionMathTests
     [InlineData(2, 0.2f)]
     [InlineData(3, 0f)]
     [InlineData(4, 0f)]
-    public void Gain_MatchesTheBlockedTileProgression(int blockedTiles, float expected)
+    public void Gain_MatchesTheObstacleProgression(int obstacles, float expected)
     {
-        Assert.Equal(expected, OcclusionMath.Gain(blockedTiles), 3);
+        Assert.Equal(expected, OcclusionMath.Gain(obstacles), 3);
     }
 
     [Fact]
     public void Gain_IsMonotonic()
     {
         float previous = OcclusionMath.Gain(0);
-        for (int blocked = 1; blocked <= 3; blocked++)
+        for (int obstacles = 1; obstacles <= 3; obstacles++)
         {
-            float current = OcclusionMath.Gain(blocked);
-            Assert.True(current < previous, $"gain at {blocked} was {current}, previous {previous}");
+            float current = OcclusionMath.Gain(obstacles);
+            Assert.True(current < previous, $"gain at {obstacles} was {current}, previous {previous}");
             previous = current;
         }
     }
@@ -34,20 +34,20 @@ public class OcclusionMathTests
     [InlineData(2, 0.10f)]
     [InlineData(3, 0.08f)]
     [InlineData(10, 0.08f)]
-    public void LowPassAlpha_MatchesTheBlockedTileProgression(int blockedTiles, float expected)
+    public void LowPassAlpha_MatchesTheObstacleProgression(int obstacles, float expected)
     {
-        Assert.Equal(expected, OcclusionMath.LowPassAlpha(blockedTiles), 3);
+        Assert.Equal(expected, OcclusionMath.LowPassAlpha(obstacles), 3);
     }
 
     [Fact]
     public void LowPassAlpha_NeverDropsBelowItsFloor()
     {
-        for (int blocked = 0; blocked < 20; blocked++)
-            Assert.True(OcclusionMath.LowPassAlpha(blocked) >= 0.08f);
+        for (int obstacles = 0; obstacles < 20; obstacles++)
+            Assert.True(OcclusionMath.LowPassAlpha(obstacles) >= 0.08f);
     }
 
     [Fact]
-    public void IsSilent_StartsAtThreeBlockedTiles()
+    public void IsSilent_StartsAtThreeObstacles()
     {
         Assert.False(OcclusionMath.IsSilent(0));
         Assert.False(OcclusionMath.IsSilent(1));

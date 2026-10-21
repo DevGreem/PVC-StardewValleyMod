@@ -7,71 +7,142 @@ using Xunit;
 
 public class WallOcclusionTests
 {
-    [Fact]
-    public void CountBlockingTiles_ClearLine_ReturnsZero()
-    {
-        int blocked = WallOcclusion.CountBlockingTiles(0, 2, 4, 2, Grid(5, 5));
+    private const int MapWall = -1;
+    private const int Cabin = 10;
+    private const int Shed = 11;
 
-        Assert.Equal(0, blocked);
+    [Fact]
+    public void CountObstacles_ClearLine_ReturnsZero()
+    {
+        int obstacles = WallOcclusion.CountObstacles(0, 2, 4, 2, Grid(5, 5));
+
+        Assert.Equal(0, obstacles);
     }
 
     [Fact]
-    public void CountBlockingTiles_CountsOneWall()
+    public void CountObstacles_OneMapWall_ReturnsOne()
     {
-        int blocked = WallOcclusion.CountBlockingTiles(0, 2, 4, 2, Grid(5, 5, (2, 2)));
+        int obstacles = WallOcclusion.CountObstacles(0, 2, 4, 2, Grid(5, 5, (2, 2, MapWall)));
 
-        Assert.Equal(1, blocked);
+        Assert.Equal(1, obstacles);
     }
 
     [Fact]
-    public void CountBlockingTiles_CountsATwoTileThickWall()
+    public void CountObstacles_ThickMapWall_ReturnsOne()
     {
-        int blocked = WallOcclusion.CountBlockingTiles(0, 2, 4, 2, Grid(5, 5, (2, 2), (3, 2)));
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            2,
+            5,
+            2,
+            Grid(6, 5, (2, 2, MapWall), (3, 2, MapWall), (4, 2, MapWall)));
 
-        Assert.Equal(2, blocked);
+        Assert.Equal(1, obstacles);
     }
 
     [Fact]
-    public void CountBlockingTiles_CountsAFiveTileBuildingFootprint()
+    public void CountObstacles_TwoSeparatedMapWalls_ReturnsTwo()
     {
-        int blocked = WallOcclusion.CountBlockingTiles(
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            2,
+            6,
+            2,
+            Grid(7, 5, (2, 2, MapWall), (4, 2, MapWall)));
+
+        Assert.Equal(2, obstacles);
+    }
+
+    [Fact]
+    public void CountObstacles_OneBuildingFootprint_ReturnsOne()
+    {
+        int obstacles = WallOcclusion.CountObstacles(
             0,
             2,
             8,
             2,
-            Grid(9, 5, (2, 2), (3, 2), (4, 2), (5, 2), (6, 2)));
+            Grid(9, 5, (2, 2, Cabin), (3, 2, Cabin), (4, 2, Cabin), (5, 2, Cabin), (6, 2, Cabin)));
 
-        Assert.Equal(5, blocked);
-        Assert.True(OcclusionMath.IsSilent(blocked));
+        Assert.Equal(1, obstacles);
     }
 
     [Fact]
-    public void CountBlockingTiles_SkipsTheEndpoints()
+    public void CountObstacles_TwoAdjacentBuildings_ReturnsTwo()
     {
-        int blocked = WallOcclusion.CountBlockingTiles(0, 2, 4, 2, Grid(5, 5, (0, 2), (4, 2)));
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            2,
+            8,
+            2,
+            Grid(9, 5, (2, 2, Cabin), (3, 2, Cabin), (5, 2, Shed), (6, 2, Shed)));
 
-        Assert.Equal(0, blocked);
+        Assert.Equal(2, obstacles);
     }
 
     [Fact]
-    public void CountBlockingTiles_CountsADiagonalWall()
+    public void CountObstacles_BuildingAndWall_ReturnsTwo()
     {
-        int blocked = WallOcclusion.CountBlockingTiles(0, 0, 3, 3, Grid(4, 4, (1, 1), (2, 2)));
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            2,
+            8,
+            2,
+            Grid(9, 5, (2, 2, Cabin), (3, 2, Cabin), (6, 2, MapWall)));
 
-        Assert.Equal(2, blocked);
+        Assert.Equal(2, obstacles);
     }
 
     [Fact]
-    public void CountBlockingTiles_OutOfBoundsTilesDoNotThrow()
+    public void CountObstacles_ThreeObstacles_AreSilent()
     {
-        int blocked = WallOcclusion.CountBlockingTiles(
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            2,
+            12,
+            2,
+            Grid(13, 5, (2, 2, MapWall), (5, 2, Cabin), (6, 2, Cabin), (9, 2, MapWall)));
+
+        Assert.Equal(3, obstacles);
+        Assert.True(OcclusionMath.IsSilent(obstacles));
+    }
+
+    [Fact]
+    public void CountObstacles_SkipsTheEndpoints()
+    {
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            2,
+            4,
+            2,
+            Grid(5, 5, (0, 2, MapWall), (4, 2, MapWall)));
+
+        Assert.Equal(0, obstacles);
+    }
+
+    [Fact]
+    public void CountObstacles_DiagonalWall_CountsOneRun()
+    {
+        int obstacles = WallOcclusion.CountObstacles(
+            0,
+            0,
+            3,
+            3,
+            Grid(4, 4, (1, 1, MapWall), (2, 2, MapWall)));
+
+        Assert.Equal(1, obstacles);
+    }
+
+    [Fact]
+    public void CountObstacles_OutOfBoundsTilesDoNotThrow()
+    {
+        int obstacles = WallOcclusion.CountObstacles(
             -4,
             2,
             8,
             2,
-            (x, y) => x >= 0 && y >= 0 && x < 5 && y < 5 && x == 2 && y == 2);
+            (x, y) => x >= 0 && y >= 0 && x < 5 && y < 5 && x == 2 && y == 2 ? MapWall : 0);
 
-        Assert.Equal(1, blocked);
+        Assert.Equal(1, obstacles);
     }
 
     [Theory]
@@ -87,15 +158,14 @@ public class WallOcclusionTests
         Assert.Equal(expected, WallOcclusion.IsPassable(value));
     }
 
-    [Fact]
-    public void IsPassable_AbsentPropertyIsNotPassable()
+    private static Func<int, int, int> Grid(int width, int height, params (int X, int Y, int Id)[] tiles)
     {
-        Assert.False(WallOcclusion.IsPassable(null));
-    }
+        Dictionary<(int X, int Y), int> map = new();
+        foreach ((int x, int y, int id) in tiles)
+            map[(x, y)] = id;
 
-    private static Func<int, int, bool> Grid(int width, int height, params (int X, int Y)[] walls)
-    {
-        HashSet<(int X, int Y)> set = new(walls);
-        return (x, y) => x >= 0 && y >= 0 && x < width && y < height && set.Contains((x, y));
+        return (x, y) => x >= 0 && y >= 0 && x < width && y < height && map.TryGetValue((x, y), out int id)
+            ? id
+            : 0;
     }
 }

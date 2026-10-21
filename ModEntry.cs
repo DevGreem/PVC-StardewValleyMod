@@ -751,12 +751,16 @@ public sealed class ModEntry : Mod
                 continue;
             }
 
-            int blockedTiles = this._effectiveWallOcclusion
-                ? WallOcclusion.CountBlockingTiles(Game1.player.currentLocation, farmer.Tile, Game1.player.Tile)
+            int obstacles = this._effectiveWallOcclusion
+                ? WallOcclusion.CountObstacles(Game1.player.currentLocation, farmer.Tile, Game1.player.Tile)
                 : 0;
 
-            channel.OcclusionAlphaTarget = OcclusionMath.LowPassAlpha(blockedTiles);
-            channel.Volume = distanceGain * OcclusionMath.Gain(blockedTiles);
+            bool inCave = EnvironmentAcoustics.IsCave(Game1.player.currentLocation);
+            float gain = distanceGain * OcclusionMath.Gain(obstacles);
+            float alpha = OcclusionMath.LowPassAlpha(obstacles);
+
+            channel.Volume = EnvironmentAcoustics.ApplyGain(gain, inCave);
+            channel.OcclusionAlphaTarget = EnvironmentAcoustics.ApplyLowPassAlpha(alpha, inCave);
 
             if (channel.Volume > 0f)
                 this._speakerScratch.Add(channel);
