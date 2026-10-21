@@ -9,7 +9,7 @@
 ## 2. Configuration, host synchronization and settings panel
 
 - [x] 2.1 Add `WallOcclusion` (boolean, default `true`) to `ModConfig` and `ResetToDefaults` as the host's preference; verify old configs load it as `true` and reset restores it
-- [x] 2.2 Add a `WallOcclusionMessage` and a pure sync policy that accepts only host messages and resolves clients to `true` until a host value arrives; verify tests cover host-only acceptance and the no-host fallback
+- [x] 2.2 Add a `WallOcclusionMessage` and a pure sync policy that accepts only host messages, lets the host answer client requests and resolves clients to `true` until a host value arrives; verify tests cover host-only acceptance, request replies and the no-host fallback
 - [x] 2.3 Broadcast the host value after a save loads, when a peer connects and when the host changes it; verify a late joiner receives the current value and a client cannot apply its own value
 - [x] 2.4 Make the GMCM wall-occlusion control host-only: the host can change it, clients see the host's effective value and their changes are ignored; verify the tooltip and reset behavior
 - [x] 2.5 Document the host-controlled behavior, the client lock and the host-without-mod fallback in `README.md`; verify every documented value matches the code

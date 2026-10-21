@@ -91,7 +91,7 @@ A client applies the message only when all of these hold: it is not the main pla
 
 - **Why:** a dedicated message is smaller and easier to validate than adding a field to every voice packet, and the voice wire format stays unchanged.
 - **Alternative rejected:** putting the boolean in each voice packet wastes bandwidth and mixes a session setting with media.
-- **Late join:** `PeerConnected` re-sends the current value, so a client that joins after the initial broadcast is brought up to date.
+- **Late join:** `PeerConnected` re-sends the current value, so a client that joins after the initial broadcast is brought up to date. A client also sends a request when its save finishes loading; the host answers that player directly, so a message sent while the client was still loading is not lost.
 
 ### D8 — Tests are split between pure math, line walking and sync policy
 
