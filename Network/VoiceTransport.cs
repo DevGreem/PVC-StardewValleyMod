@@ -132,12 +132,26 @@ public sealed class VoiceTransport : IDisposable
                 host.Tile.Y));
         }
 
-        return VoiceRecipientRules.Select(
+        long[] recipients = VoiceRecipientRules.Select(
             local.currentLocation.NameOrUniqueName,
             local.Tile.X,
             local.Tile.Y,
             packet.ProximityRadius,
             candidates);
+
+        // The host is the session authority and may need to receive client voice
+        // even if its replicated tile is briefly stale. The host applies its own
+        // location/range gate before playback, so this does not force playback.
+        if (!Context.IsMainPlayer
+            && host is not null
+            && host.UniqueMultiplayerID != local.UniqueMultiplayerID
+            && Array.IndexOf(recipients, host.UniqueMultiplayerID) < 0)
+        {
+            Array.Resize(ref recipients, recipients.Length + 1);
+            recipients[^1] = host.UniqueMultiplayerID;
+        }
+
+        return recipients;
     }
 
     /// <summary>Get whether an envelope sender ID belongs to a current farmer or the host.</summary>
