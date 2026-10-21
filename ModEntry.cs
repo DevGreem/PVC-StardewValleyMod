@@ -29,11 +29,13 @@ public sealed class ModEntry : Mod
     private AudioEngine _audio = null!;
     private CapturePipeline _capture = null!;
     private VoiceTransport _transport = null!;
+    private readonly PlayerMuteList _mutes = new();
 
     private SButton _pushToTalkKey = SButton.V;
     private SButton _microphoneToggleKey = SButton.F7;
     private SButton _microphoneTestKey = SButton.F9;
     private SButton _cycleRadiusKey = SButton.F8;
+    private SButton _playerMuteKey = SButton.F10;
     private bool _microphoneEnabled;
     private bool _microphoneTestActive;
     private bool _microphoneWasEnabledBeforeTest;
@@ -68,6 +70,7 @@ public sealed class ModEntry : Mod
 
         this._configManager = new ConfigManager(helper, this.Monitor);
         this._config = this._configManager.Load();
+        this._mutes.Rebuild(this._config);
         this.ParseKeys();
         this._mixer.SetMasterVolume(this._config.PlaybackVolume / 100f);
 
@@ -107,6 +110,7 @@ public sealed class ModEntry : Mod
     public void OnConfigChanged()
     {
         this._config.Normalize();
+        this._mutes.Rebuild(this._config);
         this.ParseKeys();
         this.UpdateCaptureSettings();
         this._mixer.SetMasterVolume(this._config.PlaybackVolume / 100f);
@@ -343,6 +347,13 @@ public sealed class ModEntry : Mod
 
     private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
     {
+        if (e.Button == this._playerMuteKey)
+        {
+            this.OpenPlayerMuteMenu();
+            this.Helper.Input.Suppress(e.Button);
+            return;
+        }
+
         if (e.Button == this._microphoneTestKey)
         {
             this.SetMicrophoneTestActive(!this._microphoneTestActive);
@@ -386,6 +397,54 @@ public sealed class ModEntry : Mod
             this._transport.ClearOutgoing();
             this.Monitor.Log($"Push-to-talk released ({e.Button}).", LogLevel.Trace);
         }
+    }
+
+    private void OpenPlayerMuteMenu()
+    {
+        if (!this.IsMultiplayerWorld() || Game1.player is null)
+        {
+            this.Monitor.Log("The player-mute menu is only available in a multiplayer world.", LogLevel.Trace);
+            return;
+        }
+
+        if (Game1.activeClickableMenu is not null)
+            return;
+
+        Game1.activeClickableMenu = new PlayerMuteMenu(
+            this._config,
+            this.BuildPlayerMuteCandidates,
+            this.TogglePlayerMute);
+        Game1.playSound("bigSelect");
+    }
+
+    private IReadOnlyList<PlayerMuteCandidate> BuildPlayerMuteCandidates()
+    {
+        List<PlayerMuteCandidate> players = new();
+        if (!this.IsMultiplayerWorld() || Game1.player is null)
+            return players;
+
+        foreach (Farmer farmer in Game1.otherFarmers.Values)
+        {
+            if (farmer.UniqueMultiplayerID == Game1.player.UniqueMultiplayerID)
+                continue;
+
+            players.Add(new PlayerMuteCandidate(
+                farmer.UniqueMultiplayerID,
+                farmer.Name,
+                farmer.currentLocation?.NameOrUniqueName ?? "",
+                (int)farmer.Tile.X,
+                (int)farmer.Tile.Y,
+                this._mutes.IsMuted(farmer.UniqueMultiplayerID)));
+        }
+
+        return players;
+    }
+
+    private void TogglePlayerMute(long playerId, string playerName)
+    {
+        this._mutes.Toggle(this._config, playerId, playerName);
+        this.SaveConfig();
+        this.Monitor.Log($"Player {playerName} is now {(this._mutes.IsMuted(playerId) ? "muted" : "unmuted")} locally.", LogLevel.Info);
     }
 
     private void OnPeerDisconnected(object? sender, PeerDisconnectedEventArgs e)
@@ -484,6 +543,9 @@ public sealed class ModEntry : Mod
     private void OnVoicePacketReceived(long playerId, VoicePacket packet)
     {
         if (this._microphoneTestActive)
+            return;
+
+        if (this._mutes.IsMuted(playerId))
             return;
 
         if (!this._loggedModMessageHook)
@@ -734,6 +796,13 @@ public sealed class ModEntry : Mod
                 continue;
             }
 
+            if (this._mutes.IsMuted(channel.PlayerId))
+            {
+                channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
+                continue;
+            }
+
             float distance = Vector2.Distance(farmer.Tile, Game1.player.Tile);
             channel.DistanceTiles = distance;
 
@@ -797,6 +866,7 @@ public sealed class ModEntry : Mod
         this._microphoneToggleKey = KeybindUtil.Parse(this._config.MicrophoneToggleKey, SButton.F7);
         this._microphoneTestKey = KeybindUtil.Parse(this._config.MicrophoneTestKey, SButton.F9);
         this._cycleRadiusKey = KeybindUtil.Parse(this._config.CycleRadiusKey, SButton.F8);
+        this._playerMuteKey = KeybindUtil.Parse(this._config.PlayerMuteKey, SButton.F10);
     }
 
     private bool IsMultiplayerWorld()
