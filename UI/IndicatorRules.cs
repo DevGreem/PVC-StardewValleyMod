@@ -4,9 +4,9 @@ namespace ProximityVoiceChat.UI;
 public static class IndicatorRules
 {
     /// <summary>Get whether a speaker should appear in the nearby list.</summary>
-    public static bool IsNearbySpeaking(float volume, bool isSpeaking)
+    public static bool IsNearbySpeaking(bool isNearby, bool isSpeaking)
     {
-        return volume > 0f && isSpeaking;
+        return isNearby && isSpeaking;
     }
 
     /// <summary>Get whether the indicator should be drawn at all.</summary>

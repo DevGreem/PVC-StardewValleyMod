@@ -88,8 +88,10 @@ Press `F10` (or the configured player-mute key) to open the local player menu. I
 
 Click a player row to mute or unmute that player. Mutes are **local**: they silence that player
 only on your machine, while everyone else continues to hear them. The list is saved in your
-config and persists across sessions. The HUD stays click-through; the menu is the interactive
-surface. Resetting the settings clears the mute list.
+config and persists across sessions. A muted player who is nearby and speaking still appears in
+the HUD with a muted-microphone icon, so you can tell they are talking without hearing them. The
+HUD stays click-through; the menu is the interactive surface. Resetting the settings clears the
+mute list.
 
 ## Settings
 
@@ -144,7 +146,8 @@ While a multiplayer world is loaded, the indicator shows:
 
 - whether your microphone is muted, on, or currently transmitting;
 - the active voice reach;
-- the names of nearby players who are speaking.
+- the names of nearby players who are speaking, with a muted-microphone icon next to players you
+  have muted locally.
 
 It is drawn in the HUD, does not intercept clicks or keystrokes, and is hidden in single-player.
 Clear **Show voice indicator** in the settings to hide it.

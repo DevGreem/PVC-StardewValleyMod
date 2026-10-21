@@ -12,7 +12,7 @@ The current GMCM subset only supports static options (`AddBoolOption`, `AddNumbe
 
 - Silence a specific remote player locally, immediately and persistently.
 - Let the player manage both nearby farmers and anyone else in the server.
-- Keep the existing HUD visual and click-through.
+- Keep the existing HUD visual and click-through, while marking muted nearby speakers.
 - Keep the feature local: no protocol, packet or host-authority changes.
 
 **Non-Goals:**
@@ -34,13 +34,13 @@ Add `MutedPlayers` to `ModConfig` as a list of small entries containing the long
 - **Alternative rejected:** matching only by name breaks with duplicate or changed names.
 - **Normalization:** trim names, drop invalid/non-positive IDs and deduplicate by ID. The list survives restarts; reset-to-defaults clears it.
 
-### D2 — Apply mute in both receive and playback paths
+### D2 — Keep decoding muted players so the HUD can show their speaking state
 
-If a player is muted, `OnVoicePacketReceived` drops the packet before decoding, and `UpdateSpeakerState` forces the existing channel volume to zero and removes it from the mixer snapshot. When the player is unmuted, the next packet recreates/updates the channel normally.
+If a player is muted, `UpdateSpeakerState` forces the channel volume to zero and removes it from the mixer snapshot. The channel still receives and decodes packets with `enqueueAudio: false`, because `IsSpeaking` is what feeds the HUD's nearby list; decoded frames are discarded instead of buffered. Any audio queued before the mute is also dropped. When the player is unmuted, the next packet starts a fresh buffer and the channel becomes audible again.
 
-- **Why:** dropping packets saves decode work for muted players, while the playback check handles an already-open channel immediately.
-- **Alternative rejected:** muting only at the mixer still decodes and buffers audio that will never be heard.
-- **Consequence:** unmuting may take until the next voice frame; that is unavoidable and short.
+- **Why:** dropping the packets before decoding would make a muted speaker disappear from the HUD, which is exactly what this enhancement must avoid.
+- **Alternative rejected:** muting at receive time saves CPU but loses the speaking state needed by the indicator.
+- **Consequence:** muted speakers cost decode work while they are in range; the concurrent-speaker cap still bounds the mixer, not the decoder.
 
 ### D3 — Use a dedicated `PlayerMuteMenu` with Nearby and All views
 
@@ -67,11 +67,12 @@ GMCM does not list players; the paragraph points to the menu.
 - **Why:** the key must be discoverable and configurable, but the dynamic content belongs in the menu.
 - **Alternative rejected:** a text option with player names would be awkward, limited to one selection and not refresh reliably.
 
-### D5 — Keep the HUD unchanged and click-through
+### D5 — Keep the HUD visual, click-through and informative
 
-`VoiceIndicator` continues to draw only the microphone state, voice reach and nearby speakers. It does not add hitboxes or capture clicks. The menu is the only interactive mute surface.
+`VoiceIndicator` continues to draw only the microphone state, voice reach and nearby speakers. It does not add hitboxes or capture clicks. Each nearby row gains a small muted-microphone marker when the local player has muted that speaker; the marker is drawn with primitives, so no texture asset is required. The menu remains the only interactive mute surface.
 
-- **Why:** the existing indicator spec explicitly requires click-through; adding clickable rows would complicate that contract.
+- **Why:** the existing indicator spec explicitly requires click-through; adding clickable rows would complicate that contract, but the player still needs to see who is speaking while muted.
+- **Alternative rejected:** hiding muted speakers, which makes it look like they are not talking.
 - **Alternative rejected:** a togglable interactive HUD overlay; defer it to a future change if players want it.
 
 ### D6 — Defaults and reset
@@ -88,7 +89,8 @@ GMCM does not list players; the paragraph points to the menu.
 - `PlayerMuteList` tests: add, remove, toggle, duplicate handling, lookup by ID and reset.
 - `ModConfig` tests: default empty list, serialization round-trip, normalization of duplicates/invalid IDs and reset.
 - Menu-model tests: Nearby filters by location and distance; All includes players in other locations; rows are sorted and carry the mute state.
-- Manual checks: mute/unmute from Nearby, mute someone from All, restart persistence, muted player still hears the local player, and the HUD remains click-through.
+- Indicator tests: a muted nearby speaker is still considered for the HUD, while an out-of-range muted player is not.
+- Manual checks: mute/unmute from Nearby, mute someone from All, restart persistence, muted player still hears the local player, the muted speaker remains visible with the icon, and the HUD remains click-through.
 
 ## Risks / Trade-offs
 

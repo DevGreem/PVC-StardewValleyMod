@@ -17,6 +17,7 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
     private volatile float _volume;
     private volatile int _proximityRadius = ModConstants.DefaultProximityRadius;
     private volatile float _occlusionAlphaTarget = 1f;
+    private volatile bool _isNearby;
     private double _lastPacketTime;
     private double _lastAudibleTime;
     private double _distanceTiles;
@@ -58,6 +59,13 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
         set => this._occlusionAlphaTarget = Math.Clamp(value, 0f, 1f);
     }
 
+    /// <summary>Whether this speaker is in the local location and inside their declared reach.</summary>
+    public bool IsNearby
+    {
+        get => this._isNearby;
+        set => this._isNearby = value;
+    }
+
     public double LastPacketTime
     {
         get
@@ -94,8 +102,8 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
                 && nowSeconds - this._lastAudibleTime <= ModConstants.SpeakingHoldMilliseconds / 1000d;
     }
 
-    /// <summary>Accept a packet, concealing sequence gaps, and enqueue decoded audio.</summary>
-    public bool Receive(VoicePacket packet, double nowSeconds)
+    /// <summary>Accept a packet, concealing sequence gaps, and enqueue decoded audio when requested.</summary>
+    public bool Receive(VoicePacket packet, double nowSeconds, bool enqueueAudio = true)
     {
         if (!packet.HasSupportedVersion())
             return false;
@@ -122,7 +130,7 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
                 else
                 {
                     for (ulong i = 0; i < missing; i++)
-                        this.DecodeLostFrameLocked();
+                        this.DecodeLostFrameLocked(enqueueAudio);
                 }
 
                 this._nextSequence = packet.Sequence;
@@ -132,7 +140,7 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
 
             float[] frame = new float[ModConstants.FrameSamples];
             int decoded = this._decoder.Decode(packet.Audio, frame);
-            if (decoded > 0)
+            if (decoded > 0 && enqueueAudio)
                 this.EnqueueLocked(frame);
 
             this._nextSequence = packet.Sequence + 1;
@@ -179,6 +187,16 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
         }
     }
 
+    /// <summary>Drop queued playback without resetting the decoder or the speaking state.</summary>
+    public void DiscardBufferedAudio()
+    {
+        lock (this._gate)
+        {
+            this._buffer.Clear();
+            this._playbackStarted = false;
+        }
+    }
+
     public void Clear()
     {
         lock (this._gate)
@@ -188,6 +206,7 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
             this._playbackStarted = false;
             this._lastPacketTime = 0d;
             this._lastAudibleTime = 0d;
+            this._isNearby = false;
             this._occlusionFilter.Reset();
             this._occlusionAlphaTarget = 1f;
             this._decoder.Reset();
@@ -204,14 +223,16 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
         }
     }
 
-    private void DecodeLostFrameLocked()
+    private void DecodeLostFrameLocked(bool enqueueAudio)
     {
         float[] frame = new float[ModConstants.FrameSamples];
         int decoded = this._decoder.Decode(ReadOnlySpan<byte>.Empty, frame);
-        this.EnqueueLocked(frame);
 
         if (decoded <= 0)
             Array.Clear(frame, 0, frame.Length);
+
+        if (enqueueAudio)
+            this.EnqueueLocked(frame);
     }
 
     private void EnqueueLocked(float[] frame)

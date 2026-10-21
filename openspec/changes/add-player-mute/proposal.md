@@ -13,6 +13,7 @@ Players can currently only control the master playback volume. There is no way t
   - **All** view: every current player in the server, regardless of location or distance.
   - Each row shows the player name, current location, and mute state; clicking toggles the mute and saves the config immediately.
 - Keep the existing HUD indicator purely visual and click-through. The menu is the interactive surface; this avoids intercepting normal game clicks.
+- Keep muted nearby speakers visible in the HUD list with a muted-microphone marker, so muting someone does not hide that they are talking. Muted packets are still decoded enough to know whether the player is speaking, but their volume stays at zero.
 - Expose the menu keybind and a short explanatory paragraph in Generic Mod Config Menu. GMCM does not get a dynamic player list because its current API subset only supports static options.
 - Add the mute keybind to the keybind settings and document that resetting settings clears the local mute list.
 - No voice packet, protocol or network change. A muted player can still hear the local player unless that player mutes them in turn.
@@ -31,6 +32,6 @@ Players can currently only control the master playback volume. There is no way t
 
 - **Code**: `Config/ModConfig.cs`, `Config/ConfigManager.cs` normalization, a mute-list service, `ModEntry` keybind/input/volume wiring, a new `UI/PlayerMuteMenu.cs`, `Integrations/GmcmIntegration.cs` and `IGenericModConfigMenuApi.cs`, tests and `README.md`.
 - **Settings**: one new keybind (`PlayerMuteKey`, default `F10`) and a persisted `MutedPlayers` list. Existing configs remain valid with an empty list.
-- **UI**: a custom `IClickableMenu` with Nearby/All views; no changes to the existing HUD drawing or click-through behavior.
+- **UI**: a custom `IClickableMenu` with Nearby/All views; the existing HUD now marks muted nearby speakers but remains visual and click-through.
 - **Network**: none; mute state is local and is never transmitted.
 - **Risks**: `UniqueMultiplayerID` stability across sessions, stale saved entries for absent players, keybind collisions, and players expecting the mute to affect the remote microphone rather than only their own playback.
