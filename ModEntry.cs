@@ -442,7 +442,7 @@ public sealed class ModEntry : Mod
         if (!this.IsMultiplayerWorld() || Game1.player is null)
             return players;
 
-        foreach (Farmer farmer in Game1.otherFarmers.Values)
+        foreach (Farmer farmer in Game1.getOnlineFarmers())
         {
             long playerId = farmer.UniqueMultiplayerID;
             if (playerId == Game1.player.UniqueMultiplayerID)
@@ -585,7 +585,8 @@ public sealed class ModEntry : Mod
         if (!this.IsMultiplayerWorld() || Game1.player is null)
             return;
 
-        if (!Game1.otherFarmers.TryGetValue(playerId, out Farmer? farmer) || farmer?.currentLocation is null)
+        Farmer? farmer = Game1.GetPlayer(playerId, onlyOnline: true);
+        if (farmer?.currentLocation is null)
             return;
 
         this._knownVoiceReach[playerId] = packet.ProximityRadius;
@@ -655,7 +656,7 @@ public sealed class ModEntry : Mod
         if (Game1.player?.currentLocation is not null && Game1.otherFarmers is not null)
         {
             string localLocation = Game1.player.currentLocation.NameOrUniqueName;
-            foreach (Farmer farmer in Game1.otherFarmers.Values)
+            foreach (Farmer farmer in Game1.getOnlineFarmers())
             {
                 long playerId = farmer.UniqueMultiplayerID;
                 if (playerId == Game1.player.UniqueMultiplayerID
@@ -871,7 +872,8 @@ public sealed class ModEntry : Mod
                 continue;
             }
 
-            if (!Game1.otherFarmers.TryGetValue(pair.Key, out Farmer? farmer) || farmer?.currentLocation is null)
+            Farmer? farmer = Game1.GetPlayer(pair.Key, onlyOnline: true);
+            if (farmer?.currentLocation is null)
             {
                 channel.Volume = 0f;
                 continue;
