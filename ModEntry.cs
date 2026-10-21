@@ -600,6 +600,7 @@ public sealed class ModEntry : Mod
             if (!ProximityMath.IsSameLocation(localLocation, farmer.currentLocation.NameOrUniqueName))
             {
                 channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
                 continue;
             }
 
@@ -609,14 +610,29 @@ public sealed class ModEntry : Mod
             if (!ProximityMath.IsInRange(distance, channel.ProximityRadius))
             {
                 channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
                 continue;
             }
 
-            channel.Volume = ProximityMath.CalculateVolume(
+            float distanceGain = ProximityMath.CalculateVolume(
                 localLocation,
                 farmer.currentLocation.NameOrUniqueName,
                 distance,
                 channel.ProximityRadius);
+
+            if (distanceGain <= 0f)
+            {
+                channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
+                continue;
+            }
+
+            int blockedTiles = this._config.WallOcclusion
+                ? WallOcclusion.CountBlockingTiles(Game1.player.currentLocation, farmer.Tile, Game1.player.Tile)
+                : 0;
+
+            channel.OcclusionAlphaTarget = OcclusionMath.LowPassAlpha(blockedTiles);
+            channel.Volume = distanceGain * OcclusionMath.Gain(blockedTiles);
 
             if (channel.Volume > 0f)
                 this._speakerScratch.Add(channel);

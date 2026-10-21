@@ -11,10 +11,12 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
     private readonly object _gate = new();
     private readonly Queue<float[]> _buffer = new();
     private readonly VoiceDecoder _decoder = new();
+    private readonly OnePoleLowPass _occlusionFilter = new();
     private ulong? _nextSequence;
     private bool _playbackStarted;
     private volatile float _volume;
     private volatile int _proximityRadius = ModConstants.DefaultProximityRadius;
+    private volatile float _occlusionAlphaTarget = 1f;
     private double _lastPacketTime;
     private double _lastAudibleTime;
     private double _distanceTiles;
@@ -47,6 +49,13 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
     {
         get => this._proximityRadius;
         set => this._proximityRadius = value;
+    }
+
+    /// <summary>Low-pass alpha target for static wall occlusion; 1 means no filtering.</summary>
+    public float OcclusionAlphaTarget
+    {
+        get => this._occlusionAlphaTarget;
+        set => this._occlusionAlphaTarget = Math.Clamp(value, 0f, 1f);
     }
 
     public double LastPacketTime
@@ -165,6 +174,7 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
 
             float[] frame = this._buffer.Dequeue();
             frame.AsSpan().CopyTo(destination);
+            this._occlusionFilter.Process(destination.Slice(0, frame.Length), this._occlusionAlphaTarget);
             return true;
         }
     }
@@ -178,6 +188,8 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
             this._playbackStarted = false;
             this._lastPacketTime = 0d;
             this._lastAudibleTime = 0d;
+            this._occlusionFilter.Reset();
+            this._occlusionAlphaTarget = 1f;
             this._decoder.Reset();
         }
     }
@@ -187,6 +199,7 @@ public sealed class SpeakerChannel : IAudioFrameSource, IDisposable
         lock (this._gate)
         {
             this._buffer.Clear();
+            this._occlusionFilter.Reset();
             this._decoder.Dispose();
         }
     }
