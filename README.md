@@ -89,7 +89,7 @@ Most changes apply live, while `StartMicrophoneEnabled` applies on the next mult
 | `InputDeviceName` | `""` (system default) | Microphone used for capture. |
 | `OutputDeviceName` | `""` (system default) | Device that plays incoming voice. |
 | `PlaybackVolume` | `100` | Master volume for incoming voice and the microphone-test monitor, 0–100. |
-| `WallOcclusion` | `true` | Whether static walls and closed doors reduce and muffle incoming voice. Local to each player. |
+| `WallOcclusion` | `true` | Host-controlled: walls and closed doors reduce and muffle incoming voice. Clients follow the host and cannot change it. |
 | `ProximityRadius` | `10` tiles | How far your voice carries: one of `3`, `10`, `20`. It does not filter the voice you hear. |
 | `ActivationMode` | `VoiceActivity` | `PushToTalk` or `VoiceActivity`. |
 | `VoiceSensitivity` | `50` | Voice-activity threshold, 0 (loud speech only) to 100 (very quiet speech). |
@@ -113,8 +113,9 @@ Config files from older builds containing `6` or `15` are normalized to `10` on 
 
 Config files created by older builds do not contain `StartMicrophoneEnabled`, `MicrophoneTestKey`,
 `MicrophoneTestMonitor` or `WallOcclusion`; they load as `false`, `F9`, `false` and `true`, so the
-microphone starts muted, the test remains opt-in and wall occlusion is enabled until the player
-changes those settings.
+microphone starts muted, the test remains opt-in and wall occlusion is enabled until the host
+changes it. The host's value is the only one used during a session; a client's local value is
+ignored.
 
 If the settings file is missing or cannot be parsed, the mod starts with the defaults, logs the
 problem and keeps a copy of the unreadable file as `config.json.broken`.
@@ -151,8 +152,12 @@ Three gates are applied to every incoming packet:
 The listener's own configured radius does not gate incoming voice. It is the local player's
 outgoing reach, so changing it changes how far others can hear you, not how far you hear them.
 
-Wall occlusion is computed locally from the listener's map and the farmers' game-state positions.
-It is never sent in a packet, and disabling `WallOcclusion` only changes what that player hears.
+Wall occlusion is controlled by the **host**. The host's choice is sent to every client and applies
+immediately; clients follow it and cannot override it locally. If the host does not run PVC, no host
+value arrives and wall occlusion stays enabled for every client.
+
+The line of sight itself is computed locally by each listener from its own map and the farmers'
+game-state positions. Only the host's on/off preference is synchronized; wall data is never sent.
 
 The sender's position is never read from the packet. The receiver looks it up in the game's own
 farmer state, so editing the mod cannot make a speaker sound closer than they are.
@@ -188,7 +193,8 @@ feature that opens the microphone outside multiplayer, and it never sends audio.
   leaves the machine. Test monitoring is off by default.
 - Only the encoded frames needed for playback are sent, and only to players in the current
   multiplayer session.
-- Wall occlusion is computed locally from the map; no wall or occlusion data is transmitted.
+- Wall occlusion is computed locally from the map; only the host's on/off preference is transmitted,
+  never wall data or voice occlusion values.
 - The indicator always shows whether your microphone is transmitting.
 
 ## Building and testing
@@ -225,7 +231,7 @@ put the path in `~/stardewvalley.targets`:
   the same game location, and the speakers are inside their own declared voice reach. Players
   without the mod are silently inaudible.
 - **Voice sounds muffled or very quiet near a building** — static walls are occluding the speaker.
-  Move to the same side of the wall or disable `WallOcclusion` in the panel.
+  Move to the same side of the wall or ask the host to disable `WallOcclusion`.
 - **Feedback during the microphone test** — turn off **Monitor microphone during test**, lower
   `PlaybackVolume`, or use headphones before enabling monitoring.
 - **Generic Mod Config Menu missing** — the mod still works and reads `config.json`; install GMCM
