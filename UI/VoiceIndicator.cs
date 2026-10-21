@@ -14,6 +14,14 @@ public sealed class VoiceIndicator
     private static readonly Color ShadowColor = Color.Black * 0.75f;
     private static readonly Color SpeakingColor = new(144, 238, 144);
 
+    private Texture2D? _mutedIcon;
+
+    /// <summary>Use the packaged muted-microphone sprite when it is available.</summary>
+    public void SetMutedIcon(Texture2D icon)
+    {
+        this._mutedIcon = icon;
+    }
+
     public void Draw(
         SpriteBatch batch,
         bool microphoneEnabled,
@@ -71,7 +79,10 @@ public sealed class VoiceIndicator
                     y + ((rowHeight - iconSize) / 2),
                     iconSize,
                     iconSize);
-                DrawMutedMic(batch, iconBounds);
+                if (this._mutedIcon is not null)
+                    batch.Draw(this._mutedIcon, iconBounds, Color.White);
+                else
+                    DrawMutedMic(batch, iconBounds);
             }
 
             y += rowHeight;
@@ -80,7 +91,7 @@ public sealed class VoiceIndicator
 
     private static int GetMutedIconSize(int lineHeight)
     {
-        return Math.Clamp((int)(lineHeight * 1.2f), 20, 48);
+        return Math.Clamp((int)(lineHeight * 1.35f), 24, 48);
     }
 
     private static void DrawText(SpriteBatch batch, string text, int x, int y, Color color)

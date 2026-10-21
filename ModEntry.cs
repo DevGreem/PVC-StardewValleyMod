@@ -81,6 +81,15 @@ public sealed class ModEntry : Mod
         this._transport = new VoiceTransport(helper, this.Monitor);
         this._capture = new CapturePipeline(this._transport.Enqueue);
 
+        try
+        {
+            this._indicator.SetMutedIcon(helper.ModContent.Load<Texture2D>("assets/muted-mic.png"));
+        }
+        catch (Exception ex)
+        {
+            this.Monitor.Log($"Could not load the muted-microphone icon; using the fallback. {ex.Message}", LogLevel.Warn);
+        }
+
         this._transport.PacketReceived += this.OnVoicePacketReceived;
         this._transport.PeerLost += this.OnPeerLost;
 
