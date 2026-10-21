@@ -593,6 +593,7 @@ public sealed class ModEntry : Mod
         this._audio.StopCapture();
         this._transport.ClearOutgoing();
         this.ClearSpeakers();
+        this._mixer.SetCaveMode(false);
         this._testMonitorSource.Clear();
         this._testMonitorSource.MonitoringEnabled = false;
         this._testMonitorAvailable = false;
@@ -629,6 +630,7 @@ public sealed class ModEntry : Mod
         this._testMonitorAvailable = false;
         this._microphoneTestLevel = 0f;
         this._mixer.SetSources(Array.Empty<IAudioFrameSource>());
+        this._mixer.SetCaveMode(false);
 
         if (!this._testPlaybackWasRunningBefore && !this.IsMultiplayerWorld())
             this._audio.StopPlayback();
@@ -658,6 +660,7 @@ public sealed class ModEntry : Mod
     private void ConfigureTestMonitor()
     {
         this._testMonitorAvailable = false;
+        this._mixer.SetCaveMode(false);
 
         if (!this._config.MicrophoneTestMonitor)
         {
@@ -691,12 +694,15 @@ public sealed class ModEntry : Mod
 
         if (!this.IsMultiplayerWorld() || Game1.player is null)
         {
+            this._mixer.SetCaveMode(false);
             this._mixer.SetChannels(Array.Empty<SpeakerChannel>());
             return;
         }
 
         double now = GetTimestampSeconds();
         string localLocation = Game1.player.currentLocation?.NameOrUniqueName ?? "";
+        bool inCave = EnvironmentAcoustics.IsCave(Game1.player.currentLocation);
+        this._mixer.SetCaveMode(inCave);
         this._mixer.SetMasterVolume(this._config.PlaybackVolume / 100f);
         this._speakerScratch.Clear();
 
@@ -755,7 +761,6 @@ public sealed class ModEntry : Mod
                 ? WallOcclusion.CountObstacles(Game1.player.currentLocation, farmer.Tile, Game1.player.Tile)
                 : 0;
 
-            bool inCave = EnvironmentAcoustics.IsCave(Game1.player.currentLocation);
             float gain = distanceGain * OcclusionMath.Gain(obstacles);
             float alpha = OcclusionMath.LowPassAlpha(obstacles);
 
@@ -804,6 +809,7 @@ public sealed class ModEntry : Mod
 
     private void ClearSpeakers()
     {
+        this._mixer.SetCaveMode(false);
         this._mixer.SetChannels(Array.Empty<SpeakerChannel>());
 
         foreach (SpeakerChannel channel in this._speakers.Values)
