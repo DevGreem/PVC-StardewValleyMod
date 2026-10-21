@@ -14,12 +14,12 @@
 ## 3. HUD and menu fallback
 
 - [x] 3.1 Verify the HUD and player-mute menu derive their unknown-reach fallback from the maximum offered value and now use `30`; add or update tests that assert the fallback and the menu's per-player reach display
-- [ ] 3.2 Verify the new range values appear in GMCM and the HUD/mute menu without hardcoded `10/20` text; run a headless visual check with a config containing `15` and `30`
+- [x] 3.2 Verify the new range values appear in GMCM and the HUD/mute menu without hardcoded `10/20` text; run a headless visual check with a config containing `15` and `30`
 
 ## 4. Verification
 
 - [x] 4.1 Run `dotnet test PVC.slnx` and `dotnet build PVC.slnx`; verify all tests pass and the build has no warnings or errors
-- [ ] 4.2 In a two-player world, set the speaker to `30` and verify a listener around 25 tiles hears them, then set `3` and verify the listener stops hearing at 3 tiles; verify the listener's own reach does not affect incoming voice
+- [x] 4.2 In a two-player world, set the speaker to `30` and verify a listener around 25 tiles hears them, then set `3` and verify the listener stops hearing at 3 tiles; verify the listener's own reach does not affect incoming voice
 - [x] 4.3 Verify a config containing legacy `6/10/20` loads as `3/15/30` without errors, and a config containing `30` is preserved on reload
 
 ## Workflow follow-up
