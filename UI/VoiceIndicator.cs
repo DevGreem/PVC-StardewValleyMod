@@ -28,7 +28,8 @@ public sealed class VoiceIndicator
         bool transmitting,
         ActivationMode activationMode,
         int voiceReach,
-        IReadOnlyList<VoiceIndicatorSpeaker> speakers)
+        IReadOnlyList<VoiceIndicatorSpeaker> speakers,
+        int hiddenSpeakerCount)
     {
         List<string> header = new()
         {
@@ -41,6 +42,7 @@ public sealed class VoiceIndicator
         int lineHeight = Game1.smallFont.LineSpacing;
         int iconSize = GetMutedIconSize(lineHeight);
         int rowHeight = Math.Max(lineHeight, iconSize + 2);
+        string overflowText = IndicatorRules.FormatNearbyOverflow(hiddenSpeakerCount);
         int width = 0;
         foreach (string line in header)
             width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(line).X);
@@ -51,8 +53,12 @@ public sealed class VoiceIndicator
         foreach (VoiceIndicatorSpeaker speaker in speakers)
             width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(speaker.Name).X + iconSize + 8);
 
+        if (overflowText.Length > 0)
+            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(overflowText).X);
+
         int headerHeight = header.Count * lineHeight;
-        int speakerHeight = speakers.Count > 0 ? (1 + speakers.Count) * rowHeight : 0;
+        int summaryRows = overflowText.Length > 0 ? 1 : 0;
+        int speakerHeight = speakers.Count > 0 ? (1 + speakers.Count + summaryRows) * rowHeight : 0;
         Rectangle background = new(8, 8, width + 16, headerHeight + speakerHeight + 12);
         batch.Draw(Game1.staminaRect, background, Color.Black * 0.55f);
 
@@ -87,6 +93,9 @@ public sealed class VoiceIndicator
 
             y += rowHeight;
         }
+
+        if (overflowText.Length > 0)
+            DrawText(batch, overflowText, 16, y + ((rowHeight - lineHeight) / 2), Color.LightGray);
     }
 
     private static int GetMutedIconSize(int lineHeight)

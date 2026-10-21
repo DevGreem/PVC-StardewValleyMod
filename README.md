@@ -154,7 +154,9 @@ While a multiplayer world is loaded, the indicator shows:
 - whether your microphone is muted, on, or currently transmitting;
 - the active voice reach;
 - the names of nearby players who are speaking, plus nearby players you have muted locally (even
-  while silent), with a muted-microphone icon next to the muted players.
+  while silent), with a muted-microphone icon next to the muted players;
+- up to seven player rows; when more players are nearby, a final row reports the rest as
+  `+N players nearby`.
 
 It is drawn in the HUD, does not intercept clicks or keystrokes, and is hidden in single-player.
 Clear **Show voice indicator** in the settings to hide it.
