@@ -192,6 +192,14 @@ public sealed class GmcmIntegration
 
         api.AddBoolOption(
             manifest,
+            () => this._mod.EffectiveWallOcclusion,
+            value => this._mod.SetWallOcclusion(value),
+            () => "Wall occlusion (host)",
+            () => "Host-controlled: only the host can change it. Clients follow the host; if the host does not run PVC, it stays enabled.",
+            "wall-occlusion");
+
+        api.AddBoolOption(
+            manifest,
             () => this._mod.IsMicrophoneEnabled,
             value => this._mod.SetMicrophoneEnabled(value),
             () => "Microphone enabled",
@@ -204,6 +212,7 @@ public sealed class GmcmIntegration
     private void ResetToDefaults()
     {
         this._config.ResetToDefaults();
+        this._mod.SetWallOcclusion(true);
         this._mod.SetMicrophoneTestActive(false);
         this._mod.SetMicrophoneEnabled(false);
         this._mod.OnConfigChanged();

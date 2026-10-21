@@ -5,6 +5,7 @@ public static class ModConstants
 {
     public const string ModId = "Greem.ProximityVoiceChat";
     public const string VoiceMessageType = "voice";
+    public const string WallOcclusionMessageType = "wall-occlusion";
 
     public const int SampleRate = 48000;
     public const int Channels = 1;

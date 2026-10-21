@@ -21,6 +21,7 @@ public class ModConfigTests
         Assert.Equal("", config.InputDeviceName);
         Assert.Equal("", config.OutputDeviceName);
         Assert.Equal(100, config.PlaybackVolume);
+        Assert.True(config.WallOcclusion);
         Assert.Equal(10, config.ProximityRadius);
         Assert.Equal(ActivationMode.VoiceActivity, config.ActivationMode);
         Assert.Equal(50, config.VoiceSensitivity);
@@ -41,6 +42,7 @@ public class ModConfigTests
             InputDeviceName = "Microphone (USB)",
             OutputDeviceName = "Speakers (USB)",
             PlaybackVolume = 65,
+            WallOcclusion = false,
             ProximityRadius = 20,
             ActivationMode = ActivationMode.PushToTalk,
             VoiceSensitivity = 15,
@@ -60,6 +62,7 @@ public class ModConfigTests
         Assert.Equal(original.InputDeviceName, copy!.InputDeviceName);
         Assert.Equal(original.OutputDeviceName, copy.OutputDeviceName);
         Assert.Equal(original.PlaybackVolume, copy.PlaybackVolume);
+        Assert.Equal(original.WallOcclusion, copy.WallOcclusion);
         Assert.Equal(original.ProximityRadius, copy.ProximityRadius);
         Assert.Equal(original.ActivationMode, copy.ActivationMode);
         Assert.Equal(original.VoiceSensitivity, copy.VoiceSensitivity);
@@ -94,6 +97,7 @@ public class ModConfigTests
 
         Assert.NotNull(config);
         Assert.False(config!.StartMicrophoneEnabled);
+        Assert.True(config.WallOcclusion);
         Assert.Equal("F9", config.MicrophoneTestKey);
         Assert.False(config.MicrophoneTestMonitor);
     }
@@ -101,11 +105,12 @@ public class ModConfigTests
     [Fact]
     public void ResetToDefaults_DisablesStartMicrophone()
     {
-        ModConfig config = new() { StartMicrophoneEnabled = true, MicrophoneTestMonitor = true };
+        ModConfig config = new() { StartMicrophoneEnabled = true, MicrophoneTestMonitor = true, WallOcclusion = false };
 
         config.ResetToDefaults();
 
         Assert.False(config.StartMicrophoneEnabled);
+        Assert.True(config.WallOcclusion);
         Assert.Equal("F9", config.MicrophoneTestKey);
         Assert.False(config.MicrophoneTestMonitor);
     }
@@ -140,6 +145,7 @@ public class ModConfigTests
         Assert.Equal("", config.InputDeviceName);
         Assert.Equal("", config.OutputDeviceName);
         Assert.Equal(100, config.PlaybackVolume);
+        Assert.True(config.WallOcclusion);
         Assert.Equal(10, config.ProximityRadius);
         Assert.Equal(0, config.VoiceSensitivity);
         Assert.Equal("V", config.PushToTalkKey);
