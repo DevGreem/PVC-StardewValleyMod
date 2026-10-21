@@ -104,6 +104,10 @@ Reglas:
 | `chore` | Mantenimiento que no encaja en otro tipo |
 | `revert` | Revertir un commit anterior |
 
+Los merge commits de integración usan el formato `merge: <rama> into <destino>` y
+no se consideran commits de cambio; no sustituyen la convención de los commits de
+trabajo.
+
 ### Ejemplos
 
 ```text
