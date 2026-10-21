@@ -25,7 +25,7 @@ public sealed class ModConfig
     /// <summary>Master playback volume for incoming voice, from 0 to 100.</summary>
     public int PlaybackVolume { get; set; } = ModConstants.DefaultPlaybackVolume;
 
-    /// <summary>Whether static map walls and closed doors reduce and muffle incoming voice.</summary>
+    /// <summary>The host's preference for static wall occlusion; clients ignore their local value during a session.</summary>
     public bool WallOcclusion { get; set; } = true;
 
     /// <summary>How far the local player's voice carries, in tiles. Must be one of <see cref="ModConstants.ProximityRadii"/>.</summary>
