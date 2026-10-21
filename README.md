@@ -146,9 +146,15 @@ Three gates are applied to every incoming packet:
    are mixed first when more than eight are in range at once.
 3. **Static walls.** The line between the speaker and the listener is traced over the map's
    `Buildings` layer and the footprints of constructed buildings (cabins, sheds, barns and coops).
-   One solid tile makes the voice quieter and muffled; two make it much quieter and heavily muffled;
-   three or more make it silent. Open or passable doors on the map layer do not block, while closed
-   doors do. Player-placed objects, trees and furniture are not considered yet.
+   One obstacle (one contiguous wall segment or one constructed building) makes the voice quieter
+   and muffled; two make it much quieter and heavily muffled; three or more make it silent. This is
+   why a cabin between two farmers still lets them hear each other quietly instead of cutting the
+   voice completely. Open or passable doors on the map layer do not block, while closed doors do.
+   Player-placed objects, trees and furniture are not considered yet.
+
+In mines and farm caves, the cave environment also makes incoming voice quieter and more muffled.
+That environment effect is independent of `WallOcclusion` and applies even when wall occlusion is
+disabled by the host.
 
 The listener's own configured radius does not gate incoming voice. It is the local player's
 outgoing reach, so changing it changes how far others can hear you, not how far you hear them.
