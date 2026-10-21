@@ -32,6 +32,20 @@ public class WallOcclusionTests
     }
 
     [Fact]
+    public void CountBlockingTiles_CountsAFiveTileBuildingFootprint()
+    {
+        int blocked = WallOcclusion.CountBlockingTiles(
+            0,
+            2,
+            8,
+            2,
+            Grid(9, 5, (2, 2), (3, 2), (4, 2), (5, 2), (6, 2)));
+
+        Assert.Equal(5, blocked);
+        Assert.True(OcclusionMath.IsSilent(blocked));
+    }
+
+    [Fact]
     public void CountBlockingTiles_SkipsTheEndpoints()
     {
         int blocked = WallOcclusion.CountBlockingTiles(0, 2, 4, 2, Grid(5, 5, (0, 2), (4, 2)));

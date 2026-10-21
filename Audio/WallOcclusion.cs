@@ -2,31 +2,32 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using StardewValley;
+using StardewValley.Buildings;
 using xTile.Layers;
 using xTile.ObjectModel;
 
 namespace ProximityVoiceChat.Audio;
 
-/// <summary>Counts static wall tiles between two farmer tiles on the map's Buildings layer.</summary>
+/// <summary>Counts static wall tiles and constructed building footprints between two farmer tiles.</summary>
 public static class WallOcclusion
 {
     public const string LayerName = "Buildings";
 
     private const float SamplesPerTile = 2f;
 
-    /// <summary>Count solid static tiles between two tile positions in the given location.</summary>
+    /// <summary>Count solid static tiles and building footprints between two tile positions.</summary>
     public static int CountBlockingTiles(GameLocation? location, Vector2 fromTile, Vector2 toTile)
     {
-        Layer? layer = location?.Map?.GetLayer(LayerName);
-        if (layer == null)
+        if (location == null)
             return 0;
 
+        Layer? layer = location.Map?.GetLayer(LayerName);
         return CountBlockingTiles(
             (int)Math.Round(fromTile.X),
             (int)Math.Round(fromTile.Y),
             (int)Math.Round(toTile.X),
             (int)Math.Round(toTile.Y),
-            (x, y) => IsBlocking(layer, x, y));
+            (x, y) => (layer != null && IsBlocking(layer, x, y)) || IsBuildingFootprint(location, x, y));
     }
 
     /// <summary>Count solid tiles between two tile positions using a caller-provided tile test.</summary>
@@ -91,6 +92,20 @@ public static class WallOcclusion
             return false;
 
         return true;
+    }
+
+    private static bool IsBuildingFootprint(GameLocation location, int x, int y)
+    {
+        if (location.buildings == null)
+            return false;
+
+        foreach (Building building in location.buildings)
+        {
+            if (building.occupiesTile(x, y, applyTilePropertyRadius: false))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool TryGetPassable(IPropertyCollection? properties)
