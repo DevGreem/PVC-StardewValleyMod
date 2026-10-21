@@ -99,8 +99,7 @@ public sealed class ModConfig
         this.PlaybackVolume = Math.Clamp(this.PlaybackVolume, 0, 100);
         this.VoiceSensitivity = Math.Clamp(this.VoiceSensitivity, 0, 100);
 
-        if (!IsOfferedRadius(this.ProximityRadius))
-            this.ProximityRadius = ModConstants.DefaultProximityRadius;
+        this.ProximityRadius = NormalizeRadius(this.ProximityRadius);
 
         if (!Enum.IsDefined(typeof(ActivationMode), this.ActivationMode))
             this.ActivationMode = ActivationMode.VoiceActivity;
@@ -125,9 +124,7 @@ public sealed class ModConfig
             if (player == null || player.PlayerId <= 0 || !seenPlayers.Add(player.PlayerId))
                 continue;
 
-            string name = string.IsNullOrWhiteSpace(player.PlayerName)
-                ? $"Player {player.PlayerId}"
-                : player.PlayerName.Trim();
+            string name = PlayerNameSanitizer.Sanitize(player.PlayerName, player.PlayerId);
             normalizedPlayers.Add(new MutedPlayer { PlayerId = player.PlayerId, PlayerName = name });
         }
 
@@ -144,6 +141,24 @@ public sealed class ModConfig
         }
 
         return false;
+    }
+
+    /// <summary>Get whether a radius was offered by an older build and is still accepted on the wire.</summary>
+    public static bool IsLegacyRadius(int radius)
+    {
+        return radius is 6 or 10 or 20;
+    }
+
+    /// <summary>Map a loaded radius to the current set, preserving the player's intended tier.</summary>
+    private static int NormalizeRadius(int radius)
+    {
+        return radius switch
+        {
+            6 => 3,
+            10 => 15,
+            20 => 30,
+            _ => IsOfferedRadius(radius) ? radius : ModConstants.DefaultProximityRadius
+        };
     }
 
     /// <summary>Get the next offered radius after the given one, wrapping around.</summary>

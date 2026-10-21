@@ -24,6 +24,9 @@ public sealed class VoicePacket
     /// <summary>Maximum total packet size the receiver will consider.</summary>
     public const int MaxPacketBytes = HeaderBytes + MaxLocationBytes + MaxAudioBytes;
 
+    /// <summary>Maximum Base64 length of a valid packet, including padding.</summary>
+    public const int MaxEncodedBase64Chars = ((MaxPacketBytes + 2) / 3) * 4;
+
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public VoicePacket(byte version, ulong sequence, int proximityRadius, string locationName, byte[] audio)

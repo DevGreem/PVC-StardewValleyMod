@@ -14,13 +14,22 @@ public sealed class VoiceIndicator
     private static readonly Color ShadowColor = Color.Black * 0.75f;
     private static readonly Color SpeakingColor = new(144, 238, 144);
 
+    private Texture2D? _mutedIcon;
+
+    /// <summary>Use the packaged muted-microphone sprite when it is available.</summary>
+    public void SetMutedIcon(Texture2D icon)
+    {
+        this._mutedIcon = icon;
+    }
+
     public void Draw(
         SpriteBatch batch,
         bool microphoneEnabled,
         bool transmitting,
         ActivationMode activationMode,
         int voiceReach,
-        IReadOnlyList<VoiceIndicatorSpeaker> speakers)
+        IReadOnlyList<VoiceIndicatorSpeaker> speakers,
+        int hiddenSpeakerCount)
     {
         List<string> header = new()
         {
@@ -33,6 +42,7 @@ public sealed class VoiceIndicator
         int lineHeight = Game1.smallFont.LineSpacing;
         int iconSize = GetMutedIconSize(lineHeight);
         int rowHeight = Math.Max(lineHeight, iconSize + 2);
+        string overflowText = IndicatorRules.FormatNearbyOverflow(hiddenSpeakerCount);
         int width = 0;
         foreach (string line in header)
             width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(line).X);
@@ -43,8 +53,12 @@ public sealed class VoiceIndicator
         foreach (VoiceIndicatorSpeaker speaker in speakers)
             width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(speaker.Name).X + iconSize + 8);
 
+        if (overflowText.Length > 0)
+            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(overflowText).X);
+
         int headerHeight = header.Count * lineHeight;
-        int speakerHeight = speakers.Count > 0 ? (1 + speakers.Count) * rowHeight : 0;
+        int summaryRows = overflowText.Length > 0 ? 1 : 0;
+        int speakerHeight = speakers.Count > 0 ? (1 + speakers.Count + summaryRows) * rowHeight : 0;
         Rectangle background = new(8, 8, width + 16, headerHeight + speakerHeight + 12);
         batch.Draw(Game1.staminaRect, background, Color.Black * 0.55f);
 
@@ -71,16 +85,22 @@ public sealed class VoiceIndicator
                     y + ((rowHeight - iconSize) / 2),
                     iconSize,
                     iconSize);
-                DrawMutedMic(batch, iconBounds);
+                if (this._mutedIcon is not null)
+                    batch.Draw(this._mutedIcon, iconBounds, Color.White);
+                else
+                    DrawMutedMic(batch, iconBounds);
             }
 
             y += rowHeight;
         }
+
+        if (overflowText.Length > 0)
+            DrawText(batch, overflowText, 16, y + ((rowHeight - lineHeight) / 2), Color.LightGray);
     }
 
     private static int GetMutedIconSize(int lineHeight)
     {
-        return Math.Clamp((int)(lineHeight * 1.2f), 20, 48);
+        return Math.Clamp((int)(lineHeight * 1.35f), 24, 48);
     }
 
     private static void DrawText(SpriteBatch batch, string text, int x, int y, Color color)

@@ -53,12 +53,22 @@ The mod SHALL determine a speaker's position from the game's own player state an
 
 ### Requirement: Proximity radius is validated
 
-The mod SHALL discard any packet whose declared proximity radius is not one of the radius values the mod itself offers.
+The mod SHALL discard a packet whose declared proximity radius is neither one of the current offered values (`3`, `15`, `30`) nor one of the legacy values (`6`, `10`, `20`) accepted for compatibility. The sender SHALL only advertise current offered values.
 
 #### Scenario: Unsupported radius declared
 
-- **WHEN** a packet declares a proximity radius outside the offered set
+- **WHEN** a packet declares a proximity radius outside both the current and legacy sets
 - **THEN** the packet is discarded
+
+#### Scenario: Current radius declared
+
+- **WHEN** a packet declares `3`, `15` or `30`
+- **THEN** the packet is accepted for proximity evaluation
+
+#### Scenario: Legacy radius declared
+
+- **WHEN** a packet declares `6`, `10` or `20` from an older build
+- **THEN** the packet is accepted for proximity evaluation instead of being discarded
 
 ### Requirement: Incoming packets are structurally validated
 
@@ -101,3 +111,63 @@ The mod SHALL release a player's buffered audio and rate-limit state as soon as 
 
 - **WHEN** a peer disconnects
 - **THEN** their pending voice state is dropped without waiting for a timeout
+
+### Requirement: Voice is sent only to eligible nearby peers
+
+The mod SHALL address an outgoing voice packet to peers in the same game location as the sender and inside the reach declared by that packet. It SHALL NOT broadcast the packet to unrelated or remotely located peers.
+
+#### Scenario: Peer in range and in the same location
+
+- **WHEN** a voice packet is sent to a peer in the sender's location and inside the packet's declared reach
+- **THEN** that peer is included as a recipient
+
+#### Scenario: Peer outside the reach
+
+- **WHEN** a peer in the same location is outside the packet's declared reach
+- **THEN** that peer is not a recipient
+
+#### Scenario: Peer in another location
+
+- **WHEN** a peer is in a different game location
+- **THEN** that peer is not a recipient
+
+#### Scenario: No eligible recipients on the host
+
+- **WHEN** the host has no peers in range and in the same location
+- **THEN** the packet is not sent
+
+### Requirement: Client voice reaches the session host
+
+On a farmhand client, the host SHALL also receive outgoing voice as session authority, even if its replicated position is briefly stale. The host applies its own location and range gate before playback.
+
+#### Scenario: Client sends to the host
+
+- **WHEN** a farmhand sends a voice packet and the host is the session authority
+- **THEN** the host is included as a recipient even if its replicated tile is temporarily stale
+
+### Requirement: Unknown voice senders are rejected before state allocation
+
+The mod SHALL discard a voice message whose sender ID is not a current farmer before creating per-sender rate-limit or decoding state.
+
+#### Scenario: Spoofed sender ID
+
+- **WHEN** a voice message arrives with an ID that is not in the current farmer list
+- **THEN** it is discarded before a rate limiter is created
+
+### Requirement: Encoded voice payload size is bounded before decoding
+
+The mod SHALL reject a voice message whose Base64 `Data` is longer than the maximum valid encoded voice packet before attempting to decode it.
+
+#### Scenario: Oversized encoded payload
+
+- **WHEN** a voice message carries a Base64 string larger than the maximum valid packet
+- **THEN** it is discarded before `Convert.FromBase64String` allocates the decoded buffer
+
+### Requirement: Voice attribution is advisory
+
+The mod SHALL treat the sender ID supplied by SMAPI as unauthenticated and SHALL NOT claim that it proves who produced the voice. Documentation SHALL state that voice attribution and local mute are advisory.
+
+#### Scenario: Modified client claims another ID
+
+- **WHEN** a modified client sends a voice message with another player's claimed ID
+- **THEN** the mod may attribute the audio to that claimed player; this limitation is documented rather than presented as authenticated identity

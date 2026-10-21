@@ -7,6 +7,12 @@ using Xunit;
 public class VoicePacketTests
 {
     [Fact]
+    public void MaxEncodedBase64Chars_CoversTheLargestValidPacket()
+    {
+        Assert.Equal(492, VoicePacket.MaxEncodedBase64Chars);
+    }
+
+    [Fact]
     public void RoundTrip_PreservesEveryField()
     {
         byte[] audio = { 1, 2, 3, 4, 5, 250 };
@@ -101,10 +107,24 @@ public class VoicePacketTests
     [Fact]
     public void Validator_RejectsUnsupportedRadius()
     {
-        VoicePacket packet = new(VoicePacket.CurrentVersion, 0, 4, "Town", new byte[] { 1 });
+        VoicePacket packet = new(VoicePacket.CurrentVersion, 0, 25, "Town", new byte[] { 1 });
 
         Assert.False(PacketValidator.IsValid(packet, out string error));
         Assert.Contains("radius", error);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(15)]
+    [InlineData(30)]
+    [InlineData(6)]
+    [InlineData(10)]
+    [InlineData(20)]
+    public void Validator_AcceptsCurrentAndLegacyRadii(int radius)
+    {
+        VoicePacket packet = new(VoicePacket.CurrentVersion, 0, radius, "Town", new byte[] { 1 });
+
+        Assert.True(PacketValidator.IsValid(packet, out string error), error);
     }
 
     [Fact]
