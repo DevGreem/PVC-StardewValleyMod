@@ -31,8 +31,9 @@
 - [x] 5.2 In a two-player world, mute and unmute from Nearby and from All; verify only the local listener is affected and the other player still hears normally
 - [x] 5.3 Restart the game and verify the saved mutes persist; verify the existing HUD remains click-through and the menu key does nothing in single-player
 - [ ] 5.4 Mute a nearby player and verify they remain visible in the HUD with the muted-microphone icon even while silent; verify they disappear only when out of range
+- [ ] 5.5 With different voice reaches, verify Nearby uses the other player's reach: a 20-tile speaker appears while audible even if the local reach is 3, and a 3-tile speaker disappears beyond 3 tiles
 
 ## Workflow follow-up
 
-- Archive after the remaining HUD muted-icon check is complete.
+- Archive after the remaining HUD muted-icon and Nearby-reach checks are complete.
 - Clickable HUD mute rows are a possible future enhancement; this change deliberately uses the menu as the interactive surface.
