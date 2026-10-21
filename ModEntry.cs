@@ -22,6 +22,8 @@ public sealed class ModEntry : Mod
     private readonly VoiceIndicator _indicator = new();
     private readonly ConcurrentDictionary<long, SpeakerChannel> _speakers = new();
     private readonly List<SpeakerChannel> _speakerScratch = new();
+    private readonly List<HudSpeaker> _hudSpeakers = new();
+    private readonly HashSet<long> _hudSpeakerIds = new();
     private readonly LocalMonitorSource _testMonitorSource = new();
 
     private ModConfig _config = new();
@@ -602,22 +604,58 @@ public sealed class ModEntry : Mod
             return;
 
         double now = GetTimestampSeconds();
-        this._speakerScratch.Clear();
+        this._hudSpeakers.Clear();
+        this._hudSpeakerIds.Clear();
 
         foreach (SpeakerChannel channel in this._speakers.Values)
         {
-            if (IndicatorRules.IsNearbySpeaking(channel.IsNearby, channel.IsSpeaking(now)))
-                this._speakerScratch.Add(channel);
+            bool isMuted = this._mutes.IsMuted(channel.PlayerId);
+            if (!IndicatorRules.IsNearbySpeakerVisible(channel.IsNearby, channel.IsSpeaking(now), isMuted))
+                continue;
+
+            this.AddHudSpeaker(channel.PlayerId, channel.PlayerName, isMuted, channel.DistanceTiles);
         }
 
-        this._speakerScratch.Sort((first, second) => first.DistanceTiles.CompareTo(second.DistanceTiles));
-        int speakerCount = Math.Min(this._speakerScratch.Count, 8);
+        // A muted player may be silent and have no fresh voice packet, so keep
+        // them listed from the live farmer data while they are in range.
+        if (Game1.player?.currentLocation is not null && Game1.otherFarmers is not null)
+        {
+            string localLocation = Game1.player.currentLocation.NameOrUniqueName;
+            foreach (Farmer farmer in Game1.otherFarmers.Values)
+            {
+                long playerId = farmer.UniqueMultiplayerID;
+                if (playerId == Game1.player.UniqueMultiplayerID
+                    || !this._mutes.IsMuted(playerId)
+                    || this._hudSpeakerIds.Contains(playerId)
+                    || farmer.currentLocation is null
+                    || !ProximityMath.IsSameLocation(localLocation, farmer.currentLocation.NameOrUniqueName))
+                {
+                    continue;
+                }
+
+                float distance = Vector2.Distance(farmer.Tile, Game1.player.Tile);
+                int reach = this._speakers.TryGetValue(playerId, out SpeakerChannel? channel)
+                    ? channel.ProximityRadius
+                    : Math.Max(this._config.ProximityRadius, ModConstants.DefaultProximityRadius);
+                if (!ProximityMath.IsInRange(distance, reach))
+                    continue;
+
+                this.AddHudSpeaker(playerId, farmer.Name, isMuted: true, distanceTiles: distance);
+            }
+        }
+
+        this._hudSpeakers.Sort((first, second) =>
+        {
+            int distanceOrder = first.DistanceTiles.CompareTo(second.DistanceTiles);
+            return distanceOrder != 0
+                ? distanceOrder
+                : StringComparer.OrdinalIgnoreCase.Compare(first.Name, second.Name);
+        });
+
+        int speakerCount = Math.Min(this._hudSpeakers.Count, 8);
         VoiceIndicatorSpeaker[] speakers = new VoiceIndicatorSpeaker[speakerCount];
         for (int i = 0; i < speakerCount; i++)
-        {
-            SpeakerChannel channel = this._speakerScratch[i];
-            speakers[i] = new VoiceIndicatorSpeaker(channel.PlayerName, this._mutes.IsMuted(channel.PlayerId));
-        }
+            speakers[i] = new VoiceIndicatorSpeaker(this._hudSpeakers[i].Name, this._hudSpeakers[i].IsMuted);
 
         this._indicator.Draw(
             e.SpriteBatch,
@@ -627,6 +665,16 @@ public sealed class ModEntry : Mod
             this._config.ProximityRadius,
             speakers);
     }
+
+    private void AddHudSpeaker(long playerId, string name, bool isMuted, double distanceTiles)
+    {
+        if (!this._hudSpeakerIds.Add(playerId))
+            return;
+
+        this._hudSpeakers.Add(new HudSpeaker(name, isMuted, distanceTiles));
+    }
+
+    private readonly record struct HudSpeaker(string Name, bool IsMuted, double DistanceTiles);
 
     /// <summary>Start or stop the local microphone test from the panel or keybind.</summary>
     public void SetMicrophoneTestActive(bool active)
@@ -774,7 +822,9 @@ public sealed class ModEntry : Mod
             SpeakerChannel channel = pair.Value;
             channel.IsNearby = false;
             double lastPacket = channel.LastPacketTime;
-            if (lastPacket > 0d && now - lastPacket > ModConstants.StaleChannelMilliseconds / 1000d)
+            if (lastPacket > 0d
+                && now - lastPacket > ModConstants.StaleChannelMilliseconds / 1000d
+                && !this._mutes.IsMuted(pair.Key))
             {
                 if (this._speakers.TryRemove(pair.Key, out SpeakerChannel? removed))
                 {

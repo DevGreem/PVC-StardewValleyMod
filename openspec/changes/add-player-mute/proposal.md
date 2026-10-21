@@ -13,7 +13,7 @@ Players can currently only control the master playback volume. There is no way t
   - **All** view: every current player in the server, regardless of location or distance.
   - Each row shows the player name, current location, and mute state; clicking toggles the mute and saves the config immediately.
 - Keep the existing HUD indicator purely visual and click-through. The menu is the interactive surface; this avoids intercepting normal game clicks.
-- Keep muted nearby speakers visible in the HUD list with a muted-microphone marker, so muting someone does not hide that they are talking. Muted packets are still decoded enough to know whether the player is speaking, but their volume stays at zero.
+- Keep muted nearby players visible in the HUD list with a muted-microphone marker, even when they are silent, so muting someone does not hide that they are nearby. Muted packets are still decoded enough to know whether the player is speaking, but their volume stays at zero.
 - Expose the menu keybind and a short explanatory paragraph in Generic Mod Config Menu. GMCM does not get a dynamic player list because its current API subset only supports static options.
 - Add the mute keybind to the keybind settings and document that resetting settings clears the local mute list.
 - No voice packet, protocol or network change. A muted player can still hear the local player unless that player mutes them in turn.

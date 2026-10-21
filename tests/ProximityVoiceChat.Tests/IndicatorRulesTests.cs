@@ -16,23 +16,26 @@ public class IndicatorRulesTests
     }
 
     [Fact]
-    public void IsNearbySpeaking_RequiresNearbyAndSpeakingState()
+    public void IsNearbySpeakerVisible_RequiresNearbyAndEitherSpeakingOrMuted()
     {
-        Assert.True(IndicatorRules.IsNearbySpeaking(true, true));
-        Assert.False(IndicatorRules.IsNearbySpeaking(false, true));
-        Assert.False(IndicatorRules.IsNearbySpeaking(true, false));
+        Assert.True(IndicatorRules.IsNearbySpeakerVisible(true, isSpeaking: true, isMuted: false));
+        Assert.True(IndicatorRules.IsNearbySpeakerVisible(true, isSpeaking: false, isMuted: true));
+        Assert.False(IndicatorRules.IsNearbySpeakerVisible(true, isSpeaking: false, isMuted: false));
+        Assert.False(IndicatorRules.IsNearbySpeakerVisible(false, isSpeaking: true, isMuted: false));
+        Assert.False(IndicatorRules.IsNearbySpeakerVisible(false, isSpeaking: false, isMuted: true));
     }
 
     [Fact]
-    public void IsNearbySpeaking_FollowsTheSpeakerDeclaredRadius()
+    public void IsNearbySpeakerVisible_FollowsTheSpeakerDeclaredRadius()
     {
         bool insideSmall = ProximityMath.IsInRange(2f, 3f);
         bool outsideSmall = ProximityMath.IsInRange(3f, 3f);
         bool insideLarge = ProximityMath.IsInRange(6f, 10f);
 
-        Assert.True(IndicatorRules.IsNearbySpeaking(insideSmall, true));
-        Assert.False(IndicatorRules.IsNearbySpeaking(outsideSmall, true));
-        Assert.True(IndicatorRules.IsNearbySpeaking(insideLarge, true));
+        Assert.True(IndicatorRules.IsNearbySpeakerVisible(insideSmall, isSpeaking: true, isMuted: false));
+        Assert.False(IndicatorRules.IsNearbySpeakerVisible(outsideSmall, isSpeaking: true, isMuted: false));
+        Assert.True(IndicatorRules.IsNearbySpeakerVisible(insideLarge, isSpeaking: true, isMuted: false));
+        Assert.False(IndicatorRules.IsNearbySpeakerVisible(outsideSmall, isSpeaking: false, isMuted: true));
     }
 
     [Fact]

@@ -3,10 +3,10 @@ namespace ProximityVoiceChat.UI;
 /// <summary>Pure decisions about what the on-screen indicator should show.</summary>
 public static class IndicatorRules
 {
-    /// <summary>Get whether a speaker should appear in the nearby list.</summary>
-    public static bool IsNearbySpeaking(bool isNearby, bool isSpeaking)
+    /// <summary>Get whether a nearby player should appear in the HUD list.</summary>
+    public static bool IsNearbySpeakerVisible(bool isNearby, bool isSpeaking, bool isMuted)
     {
-        return isNearby && isSpeaking;
+        return isNearby && (isSpeaking || isMuted);
     }
 
     /// <summary>Get whether the indicator should be drawn at all.</summary>

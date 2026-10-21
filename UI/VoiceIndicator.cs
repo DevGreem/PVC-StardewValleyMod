@@ -31,6 +31,8 @@ public sealed class VoiceIndicator
         };
 
         int lineHeight = Game1.smallFont.LineSpacing;
+        int iconSize = GetMutedIconSize(lineHeight);
+        int rowHeight = Math.Max(lineHeight, iconSize + 2);
         int width = 0;
         foreach (string line in header)
             width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(line).X);
@@ -39,10 +41,11 @@ public sealed class VoiceIndicator
             width = System.Math.Max(width, (int)Game1.smallFont.MeasureString("Nearby:").X);
 
         foreach (VoiceIndicatorSpeaker speaker in speakers)
-            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(speaker.Name).X + 18);
+            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(speaker.Name).X + iconSize + 8);
 
-        int rowCount = header.Count + (speakers.Count > 0 ? 1 + speakers.Count : 0);
-        Rectangle background = new(8, 8, width + 16, (rowCount * lineHeight) + 12);
+        int headerHeight = header.Count * lineHeight;
+        int speakerHeight = speakers.Count > 0 ? (1 + speakers.Count) * rowHeight : 0;
+        Rectangle background = new(8, 8, width + 16, headerHeight + speakerHeight + 12);
         batch.Draw(Game1.staminaRect, background, Color.Black * 0.55f);
 
         int y = 16;
@@ -55,17 +58,29 @@ public sealed class VoiceIndicator
         if (speakers.Count == 0)
             return;
 
-        DrawText(batch, "Nearby:", 16, y, TextColor);
-        y += lineHeight;
+        DrawText(batch, "Nearby:", 16, y + ((rowHeight - lineHeight) / 2), TextColor);
+        y += rowHeight;
 
         foreach (VoiceIndicatorSpeaker speaker in speakers)
         {
-            DrawText(batch, speaker.Name, 16, y, TextColor);
+            DrawText(batch, speaker.Name, 16, y + ((rowHeight - lineHeight) / 2), TextColor);
             if (speaker.IsMuted)
-                DrawMutedMic(batch, 16 + width - 12, y + 2);
+            {
+                Rectangle iconBounds = new(
+                    16 + width - iconSize,
+                    y + ((rowHeight - iconSize) / 2),
+                    iconSize,
+                    iconSize);
+                DrawMutedMic(batch, iconBounds);
+            }
 
-            y += lineHeight;
+            y += rowHeight;
         }
+    }
+
+    private static int GetMutedIconSize(int lineHeight)
+    {
+        return Math.Clamp((int)(lineHeight * 1.2f), 20, 48);
     }
 
     private static void DrawText(SpriteBatch batch, string text, int x, int y, Color color)
@@ -75,19 +90,36 @@ public sealed class VoiceIndicator
         batch.DrawString(Game1.smallFont, text, position, color);
     }
 
-    private static void DrawMutedMic(SpriteBatch batch, int x, int y)
+    private static void DrawMutedMic(SpriteBatch batch, Rectangle bounds)
     {
         Color mic = Color.White;
         Color slash = new(255, 120, 120);
+        float scaleX = bounds.Width / 12f;
+        float scaleY = bounds.Height / 12f;
 
-        batch.Draw(Game1.staminaRect, new Rectangle(x + 3, y, 4, 7), mic);
-        batch.Draw(Game1.staminaRect, new Rectangle(x + 2, y + 1, 1, 5), mic);
-        batch.Draw(Game1.staminaRect, new Rectangle(x + 7, y + 1, 1, 5), mic);
-        batch.Draw(Game1.staminaRect, new Rectangle(x + 4, y + 7, 2, 3), mic);
-        batch.Draw(Game1.staminaRect, new Rectangle(x + 2, y + 10, 6, 1), mic);
+        void Fill(int x, int y, int width, int height, Color color)
+        {
+            batch.Draw(
+                Game1.staminaRect,
+                new Rectangle(
+                    bounds.X + (int)(x * scaleX),
+                    bounds.Y + (int)(y * scaleY),
+                    Math.Max(1, (int)(width * scaleX)),
+                    Math.Max(1, (int)(height * scaleY))),
+                color);
+        }
 
-        for (int i = 0; i < 10; i++)
-            batch.Draw(Game1.staminaRect, new Rectangle(x + i, y + 10 - i, 1, 1), slash);
+        Fill(4, 0, 4, 1, mic);
+        Fill(3, 1, 6, 5, mic);
+        Fill(4, 6, 4, 1, mic);
+        Fill(1, 4, 1, 5, mic);
+        Fill(10, 4, 1, 5, mic);
+        Fill(2, 9, 9, 1, mic);
+        Fill(5, 10, 2, 1, mic);
+        Fill(4, 11, 4, 1, mic);
+
+        for (int i = 0; i < 11; i++)
+            Fill(i, 11 - i, 2, 2, slash);
     }
 
     /// <summary>Draw the local microphone test overlay, including its input-level bar.</summary>

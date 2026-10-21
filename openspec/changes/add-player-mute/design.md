@@ -12,7 +12,7 @@ The current GMCM subset only supports static options (`AddBoolOption`, `AddNumbe
 
 - Silence a specific remote player locally, immediately and persistently.
 - Let the player manage both nearby farmers and anyone else in the server.
-- Keep the existing HUD visual and click-through, while marking muted nearby speakers.
+- Keep the existing HUD visual and click-through, while keeping muted nearby players listed and marked.
 - Keep the feature local: no protocol, packet or host-authority changes.
 
 **Non-Goals:**
@@ -40,7 +40,7 @@ If a player is muted, `UpdateSpeakerState` forces the channel volume to zero and
 
 - **Why:** dropping the packets before decoding would make a muted speaker disappear from the HUD, which is exactly what this enhancement must avoid.
 - **Alternative rejected:** muting at receive time saves CPU but loses the speaking state needed by the indicator.
-- **Consequence:** muted speakers cost decode work while they are in range; the concurrent-speaker cap still bounds the mixer, not the decoder.
+- **Consequence:** muted speakers cost decode work while they are in range; the concurrent-speaker cap still bounds the mixer, not the decoder. A muted channel is also kept through the stale-packet sweep, so the HUD retains the last declared reach while the farmer is still connected; the channel is disposed on disconnect or after unmuting and going idle.
 
 ### D3 — Use a dedicated `PlayerMuteMenu` with Nearby and All views
 
@@ -69,10 +69,11 @@ GMCM does not list players; the paragraph points to the menu.
 
 ### D5 — Keep the HUD visual, click-through and informative
 
-`VoiceIndicator` continues to draw only the microphone state, voice reach and nearby speakers. It does not add hitboxes or capture clicks. Each nearby row gains a small muted-microphone marker when the local player has muted that speaker; the marker is drawn with primitives, so no texture asset is required. The menu remains the only interactive mute surface.
+`VoiceIndicator` continues to draw only the microphone state, voice reach and nearby players. It does not add hitboxes or capture clicks. Muted players remain in the list while they are in range, even when they are silent; if no recent voice channel exists, the row comes from the live farmer data, using at least the default 10-tile reach because the speaker's declared reach is unknown. Unmuted players are still listed only while speaking. Each muted row gains a muted-microphone marker scaled to the font line height; the marker is drawn with primitives, so no texture asset is required. The menu remains the only interactive mute surface.
 
-- **Why:** the existing indicator spec explicitly requires click-through; adding clickable rows would complicate that contract, but the player still needs to see who is speaking while muted.
-- **Alternative rejected:** hiding muted speakers, which makes it look like they are not talking.
+- **Why:** the existing indicator spec explicitly requires click-through; adding clickable rows would complicate that contract, but the player still needs to see who they have muted nearby.
+- **Alternative rejected:** hiding muted players, which makes it look like they are not there.
+- **Alternative rejected:** showing every unmuted player all the time, which would flood the HUD with silent players.
 - **Alternative rejected:** a togglable interactive HUD overlay; defer it to a future change if players want it.
 
 ### D6 — Defaults and reset
@@ -89,8 +90,8 @@ GMCM does not list players; the paragraph points to the menu.
 - `PlayerMuteList` tests: add, remove, toggle, duplicate handling, lookup by ID and reset.
 - `ModConfig` tests: default empty list, serialization round-trip, normalization of duplicates/invalid IDs and reset.
 - Menu-model tests: Nearby filters by location and distance; All includes players in other locations; rows are sorted and carry the mute state.
-- Indicator tests: a muted nearby speaker is still considered for the HUD, while an out-of-range muted player is not.
-- Manual checks: mute/unmute from Nearby, mute someone from All, restart persistence, muted player still hears the local player, the muted speaker remains visible with the icon, and the HUD remains click-through.
+- Indicator tests: a nearby muted player is considered for the HUD even when silent, while an out-of-range muted player is not.
+- Manual checks: mute/unmute from Nearby, mute someone from All, restart persistence, muted player still hears the local player, the muted nearby player remains visible with the icon even while silent, and the HUD remains click-through.
 
 ## Risks / Trade-offs
 
