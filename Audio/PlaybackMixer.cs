@@ -6,8 +6,11 @@ namespace ProximityVoiceChat.Audio;
 public sealed class PlaybackMixer
 {
     private readonly float[] _frame = new float[ModConstants.FrameSamples];
+    private readonly CaveEcho _caveEcho = new();
     private volatile IAudioFrameSource[] _sources = Array.Empty<IAudioFrameSource>();
     private volatile float _masterVolume = 1f;
+    private volatile bool _caveMode;
+    private bool _lastCaveMode;
 
     /// <summary>Replace the bounded, distance-ordered snapshot of speakers to mix.</summary>
     public void SetChannels(SpeakerChannel[] channels)
@@ -19,6 +22,12 @@ public sealed class PlaybackMixer
     public void SetSources(IAudioFrameSource[] sources)
     {
         this._sources = sources;
+    }
+
+    /// <summary>Enable or disable the cave echo on the mixed output.</summary>
+    public void SetCaveMode(bool enabled)
+    {
+        this._caveMode = enabled;
     }
 
     /// <summary>Set the final output gain; applied after the anti-clipping stage.</summary>
@@ -46,6 +55,16 @@ public sealed class PlaybackMixer
             for (int sample = 0; sample < ModConstants.FrameSamples; sample++)
                 output[sample] += this._frame[sample] * volume;
         }
+
+        bool caveMode = this._caveMode;
+        if (caveMode != this._lastCaveMode)
+        {
+            this._caveEcho.Reset();
+            this._lastCaveMode = caveMode;
+        }
+
+        if (caveMode)
+            this._caveEcho.Process(output);
 
         // Normalize only when the mix would exceed the output range, so quiet voices
         // keep their level instead of being attenuated by a fixed headroom factor.

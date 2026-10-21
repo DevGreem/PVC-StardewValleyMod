@@ -39,7 +39,7 @@ the expected path and disables voice chat instead of crashing the game.
 
 ## Controls
 
-The defaults are deliberately outside Stardew Valley's usual bindings. All four keys can be
+The defaults are deliberately outside Stardew Valley's usual bindings. All five keys can be
 changed in the in-game settings panel, and any key the game can bind is accepted.
 
 | Action | Default key |
@@ -48,6 +48,7 @@ changed in the in-game settings panel, and any key the game can bind is accepted
 | Toggle microphone | `F7` |
 | Cycle voice reach | `F8` |
 | Start or stop microphone test | `F9` |
+| Open player mute menu | `F10` |
 
 `MicrophoneTestKey` defaults to `F9`. If that key is already used by another PVC action (for
 example, a custom microphone toggle), the mod moves the test key to the next free function key
@@ -78,6 +79,21 @@ Monitoring is off by default to prevent feedback. The monitor uses `PlaybackVolu
 master volume as incoming voice, so you can lower that setting and confirm the change locally.
 Headphones are strongly recommended before enabling monitoring.
 
+### Player mute
+
+Press `F10` (or the configured player-mute key) to open the local player menu. It has two views:
+
+- **Nearby:** players in the same game location within the voice reach declared by **that player**,
+  so someone with a 20-tile reach appears even if your own reach is only 3.
+- **All:** every player currently in the server, regardless of location or distance.
+
+Click a player row to mute or unmute that player. Each row shows the player's own voice reach.
+Mutes are **local**: they silence that player only on your machine, while everyone else continues
+to hear them. The list is saved in your config and persists across sessions. A muted player who
+is nearby still appears in the HUD with a muted-microphone icon, even while they are silent, so
+you can see who you have silenced. The HUD stays click-through; the menu is the interactive
+surface. Resetting the settings clears the mute list.
+
 ## Settings
 
 Settings live in `Mods/ProximityVoiceChat/config.json` and are created with these defaults on
@@ -99,12 +115,16 @@ Most changes apply live, while `StartMicrophoneEnabled` applies on the next mult
 | `MicrophoneTestKey` | `F9` | Starts and stops the local microphone test. |
 | `MicrophoneTestMonitor` | `false` | Plays the microphone test through the selected output at `PlaybackVolume`. |
 | `CycleRadiusKey` | `F8` | Cycles through the offered radii. |
+| `PlayerMuteKey` | `F10` | Opens the local player-mute menu. |
+| `MutedPlayers` | `[]` | Players muted locally; managed from the player menu and saved in the config. |
 | `ShowIndicator` | `true` | Draws the on-screen voice indicator. |
 
-Changing volume, voice reach, wall occlusion or activation mode takes effect immediately. Changing an input or
-output device restarts only the affected audio stream. Changing `StartMicrophoneEnabled` applies on
-the next multiplayer world load and does not change the current session's microphone state. Every
-setting can be restored to its default in the settings panel.
+Changing volume, voice reach, wall occlusion, the player-mute key or activation mode takes effect
+immediately. Muting or unmuting a player applies on the next frame. Changing an input or output
+device restarts only the affected audio stream. Changing `StartMicrophoneEnabled` applies on the
+next multiplayer world load and does not change the current session's microphone state. Every
+setting can be restored to its default in the settings panel; resetting also clears the local mute
+list.
 
 The radius is the local player's **outgoing voice reach**: it controls how far other players can
 hear you, not how far you hear them. Each speaker's own radius decides what you hear from them.
@@ -112,10 +132,11 @@ Choose `3` for a private conversation, `10` for normal conversation or `20` for 
 Config files from older builds containing `6` or `15` are normalized to `10` on load.
 
 Config files created by older builds do not contain `StartMicrophoneEnabled`, `MicrophoneTestKey`,
-`MicrophoneTestMonitor` or `WallOcclusion`; they load as `false`, `F9`, `false` and `true`, so the
-microphone starts muted, the test remains opt-in and wall occlusion is enabled until the host
-changes it. The host's value is the only one used during a session; a client's local value is
-ignored.
+`MicrophoneTestMonitor`, `WallOcclusion`, `PlayerMuteKey` or `MutedPlayers`; they load as `false`,
+`F9`, `false`, `true`, `F10` and an empty list, so the microphone starts muted, the test remains
+opt-in, wall occlusion is enabled until the host changes it, and the player mute menu works with no
+saved mutes. The host's wall-occlusion value is the only one used during a session; a client's
+local value is ignored.
 
 If the settings file is missing or cannot be parsed, the mod starts with the defaults, logs the
 problem and keeps a copy of the unreadable file as `config.json.broken`.
@@ -126,7 +147,8 @@ While a multiplayer world is loaded, the indicator shows:
 
 - whether your microphone is muted, on, or currently transmitting;
 - the active voice reach;
-- the names of nearby players who are speaking.
+- the names of nearby players who are speaking, plus nearby players you have muted locally (even
+  while silent), with a muted-microphone icon next to the muted players.
 
 It is drawn in the HUD, does not intercept clicks or keystrokes, and is hidden in single-player.
 Clear **Show voice indicator** in the settings to hide it.
@@ -152,9 +174,10 @@ Three gates are applied to every incoming packet:
    voice completely. Open or passable doors on the map layer do not block, while closed doors do.
    Player-placed objects, trees and furniture are not considered yet.
 
-In mines and farm caves, the cave environment also makes incoming voice quieter and more muffled.
-That environment effect is independent of `WallOcclusion` and applies even when wall occlusion is
-disabled by the host.
+In mines and farm caves, incoming voice gets a short echo/reverb and a mild attenuation, so the
+cave sounds enclosed and immersive instead of just quieter. The cave echo is independent of
+`WallOcclusion` and applies even when wall occlusion is disabled by the host. The local microphone
+test monitor stays clean; the echo is only applied to remote voice playback.
 
 The listener's own configured radius does not gate incoming voice. It is the local player's
 outgoing reach, so changing it changes how far others can hear you, not how far you hear them.
@@ -202,6 +225,7 @@ feature that opens the microphone outside multiplayer, and it never sends audio.
   multiplayer session.
 - Wall occlusion is computed locally from the map; only the host's on/off preference is transmitted,
   never wall data or voice occlusion values.
+- Player mutes are local and stored in your config; they are never transmitted to other players.
 - The indicator always shows whether your microphone is transmitting.
 
 ## Building and testing
@@ -237,8 +261,12 @@ put the path in `~/stardewvalley.targets`:
 - **No voices are heard** — confirm every player installed the same major version, everyone is in
   the same game location, and the speakers are inside their own declared voice reach. Players
   without the mod are silently inaudible.
+- **One player is silent although nearby** — open the player mute menu (`F10`) and check whether
+  that player is muted locally. Mutes are saved and only affect your playback.
 - **Voice sounds muffled or very quiet near a building** — static walls are occluding the speaker.
   Move to the same side of the wall or ask the host to disable `WallOcclusion`.
+- **Voice has a short echo in a mine or farm cave** — that is the cave environment effect. It stays
+  active even if the host disables `WallOcclusion`; the local microphone test monitor is not echoed.
 - **Feedback during the microphone test** — turn off **Monitor microphone during test**, lower
   `PlaybackVolume`, or use headphones before enabling monitoring.
 - **Generic Mod Config Menu missing** — the mod still works and reads `config.json`; install GMCM

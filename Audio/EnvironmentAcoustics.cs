@@ -7,8 +7,8 @@ namespace ProximityVoiceChat.Audio;
 /// <summary>Location-based acoustic presets, separate from wall occlusion.</summary>
 public static class EnvironmentAcoustics
 {
-    public const float CaveGain = 0.55f;
-    public const float CaveLowPassAlpha = 0.35f;
+    public const float CaveGain = 0.80f;
+    public const float CaveLowPassAlpha = 0.55f;
 
     /// <summary>Get whether a location is a cave or mine.</summary>
     public static bool IsCave(GameLocation? location)
