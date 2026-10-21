@@ -106,7 +106,7 @@ Most changes apply live, while `StartMicrophoneEnabled` applies on the next mult
 | `OutputDeviceName` | `""` (system default) | Device that plays incoming voice. |
 | `PlaybackVolume` | `100` | Master volume for incoming voice and the microphone-test monitor, 0–100. |
 | `WallOcclusion` | `true` | Host-controlled: walls and closed doors reduce and muffle incoming voice. Clients follow the host and cannot change it. |
-| `ProximityRadius` | `10` tiles | How far your voice carries: one of `3`, `10`, `20`. It does not filter the voice you hear. |
+| `ProximityRadius` | `15` tiles | How far your voice carries: one of `3`, `15`, `30`. It does not filter the voice you hear. |
 | `ActivationMode` | `VoiceActivity` | `PushToTalk` or `VoiceActivity`. |
 | `VoiceSensitivity` | `50` | Voice-activity threshold, 0 (loud speech only) to 100 (very quiet speech). |
 | `StartMicrophoneEnabled` | `false` | When true, the next multiplayer world starts with the microphone enabled. The in-game toggle does not change this setting. |
@@ -128,8 +128,9 @@ list.
 
 The radius is the local player's **outgoing voice reach**: it controls how far other players can
 hear you, not how far you hear them. Each speaker's own radius decides what you hear from them.
-Choose `3` for a quiet conversation, `10` for normal conversation or `20` for long range.
-Config files from older builds containing `6` or `15` are normalized to `10` on load.
+Choose `3` for a quiet conversation, `15` for normal conversation or `30` for long range.
+Config files from older builds are migrated as `6 -> 3`, `10 -> 15` and `20 -> 30`; `3` and `15`
+remain unchanged.
 
 Proximity is a playback rule, not a confidentiality boundary. Honest clients address outgoing
 voice only to peers in the same location and inside the declared reach, but a modified client can
@@ -203,10 +204,11 @@ farmer state, so editing the mod cannot make a speaker sound closer than they ar
 ## Version compatibility
 
 The wire format carries a version byte. This build declares **wire-format version 1**. A packet
-with a different version is discarded without producing audio. This build also accepts only the
-`3`, `10` and `20` reach values: a packet that declares a removed value such as `6` or `15` is
-discarded, so all players must run the same version and update together. A wire-format change is a
-breaking release and is called out in the release notes.
+with a different version is discarded without producing audio. This build sends the current
+`3`, `15` and `30` reach values and also accepts the legacy `6`, `10` and `20` values from older
+speakers. Older clients still reject the new `30` value, so all players should update together to
+use the full range. A wire-format change is a breaking release and is called out in the release
+notes.
 
 ## Multiplayer and latency
 
@@ -229,8 +231,8 @@ feature that opens the microphone outside multiplayer, and it never sends audio.
 - Voice lives in memory only for the lifetime of a packet. Nothing is recorded or written to disk.
 - The microphone test opens the input only while you explicitly enable it, and its audio never
   leaves the machine. Test monitoring is off by default.
-- Only the encoded frames needed for playback are sent, and only to players in the current
-  multiplayer session.
+- Only the encoded frames needed for playback are sent, and honest clients address them only to
+  players in the same location and inside the declared reach.
 - Wall occlusion is computed locally from the map; only the host's on/off preference is transmitted,
   never wall data or voice occlusion values.
 - Player mutes are local and stored in your config; they are never transmitted to other players.
