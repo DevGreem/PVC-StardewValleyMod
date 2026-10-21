@@ -1,0 +1,194 @@
+using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Threading;
+using ProximityVoiceChat.Config;
+using StardewModdingAPI;
+using StardewModdingAPI.Events;
+using StardewValley;
+
+namespace ProximityVoiceChat.Network;
+
+/// <summary>The JSON envelope SMAPI serializes; the voice packet itself stays a binary blob.</summary>
+public sealed class VoiceMessage
+{
+    /// <summary>Base64-encoded <see cref="VoicePacket"/> bytes.</summary>
+    public string Data { get; set; } = "";
+}
+
+/// <summary>Sends and receives voice packets over SMAPI mod messages, with validation and rate limiting.</summary>
+public sealed class VoiceTransport : IDisposable
+{
+    private const int MaxQueuedPackets = 120;
+
+    private readonly IModHelper _helper;
+    private readonly IMonitor _monitor;
+    private readonly ConcurrentQueue<VoicePacket> _outgoing = new();
+    private readonly ConcurrentDictionary<long, RateLimiter> _rateLimiters = new();
+    private int _queuedPackets;
+    private bool _loggedFirstReceive;
+    private bool _loggedFirstOwnPacketIgnored;
+
+    public VoiceTransport(IModHelper helper, IMonitor monitor)
+    {
+        this._helper = helper;
+        this._monitor = monitor;
+        this._helper.Events.Multiplayer.ModMessageReceived += this.OnModMessageReceived;
+    }
+
+    /// <summary>Raised for each accepted packet from a known, non-local player.</summary>
+    public event Action<long, VoicePacket>? PacketReceived;
+
+    /// <summary>Raised when a peer disconnects so playback state can be released immediately.</summary>
+    public event Action<long>? PeerLost;
+
+    /// <summary>Queue one packet for the next game tick. Safe to call from the capture callback.</summary>
+    public void Enqueue(VoicePacket packet)
+    {
+        if (Interlocked.Increment(ref this._queuedPackets) > MaxQueuedPackets)
+        {
+            Interlocked.Decrement(ref this._queuedPackets);
+            return;
+        }
+
+        this._outgoing.Enqueue(packet);
+    }
+
+    /// <summary>Send queued packets on the game thread so SMAPI networking sees one caller at a time.</summary>
+    public void DrainOutgoing()
+    {
+        while (this._outgoing.TryDequeue(out VoicePacket? packet))
+        {
+            Interlocked.Decrement(ref this._queuedPackets);
+            try
+            {
+                byte[] bytes = packet.Serialize();
+                this._helper.Multiplayer.SendMessage(
+                    new VoiceMessage { Data = Convert.ToBase64String(bytes) },
+                    ModConstants.VoiceMessageType,
+                    new[] { ModConstants.ModId });
+            }
+            catch (Exception ex)
+            {
+                this._monitor.Log($"Could not send a voice packet: {ex.Message}", LogLevel.Warn);
+            }
+        }
+    }
+
+    /// <summary>Drop a peer's rate-limit state as soon as it disconnects.</summary>
+    public void Release(long playerId)
+    {
+        this._rateLimiters.TryRemove(playerId, out _);
+        this.PeerLost?.Invoke(playerId);
+    }
+
+    /// <summary>Drop every sender's rate-limit state and any queued packets when the session ends.</summary>
+    public void ReleaseAll()
+    {
+        this._rateLimiters.Clear();
+        this.ClearOutgoing();
+    }
+
+    /// <summary>Discard frames captured but not yet sent, e.g. when the microphone is muted.</summary>
+    public void ClearOutgoing()
+    {
+        while (this._outgoing.TryDequeue(out _))
+        {
+            // Drain without touching the counter for every item.
+        }
+
+        Interlocked.Exchange(ref this._queuedPackets, 0);
+    }
+
+    public void Dispose()
+    {
+        this._helper.Events.Multiplayer.ModMessageReceived -= this.OnModMessageReceived;
+    }
+
+    /// <summary>Get whether a mod message belongs to this mod and came from another player.</summary>
+    public static bool IsVoiceMessageForThisMod(string? fromModId, string? type, long fromPlayerId, long localPlayerId)
+    {
+        return string.Equals(fromModId, ModConstants.ModId, StringComparison.Ordinal)
+            && string.Equals(type, ModConstants.VoiceMessageType, StringComparison.Ordinal)
+            && fromPlayerId != localPlayerId;
+    }
+
+    private void OnModMessageReceived(object? sender, ModMessageReceivedEventArgs e)
+    {
+        if (!Context.IsWorldReady || !Context.IsMultiplayer)
+            return;
+
+        long localPlayerId = Game1.player?.UniqueMultiplayerID ?? 0L;
+        if (!IsVoiceMessageForThisMod(e.FromModID, e.Type, e.FromPlayerID, localPlayerId))
+        {
+            if (e.FromPlayerID == localPlayerId
+                && string.Equals(e.FromModID, ModConstants.ModId, StringComparison.Ordinal)
+                && string.Equals(e.Type, ModConstants.VoiceMessageType, StringComparison.Ordinal)
+                && !this._loggedFirstOwnPacketIgnored)
+            {
+                this._loggedFirstOwnPacketIgnored = true;
+                this._monitor.Log("Ignored an echoed voice packet from the local player.", LogLevel.Trace);
+            }
+
+            return;
+        }
+
+        VoiceMessage? message;
+        try
+        {
+            message = e.ReadAs<VoiceMessage>();
+        }
+        catch (Exception ex)
+        {
+            this._monitor.Log($"Discarded a voice message that could not be read: {ex.Message}", LogLevel.Trace);
+            return;
+        }
+
+        if (message?.Data is null || message.Data.Length == 0)
+            return;
+
+        // Apply the sender budget before parsing so a flood of malformed messages
+        // costs no more than dropping them.
+        RateLimiter limiter = this._rateLimiters.GetOrAdd(
+            e.FromPlayerID,
+            _ => new RateLimiter(ModConstants.MaxPacketsPerSecond));
+
+        if (!limiter.TryAcquire(GetTimestampSeconds()))
+            return;
+
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(message.Data);
+        }
+        catch (FormatException)
+        {
+            return;
+        }
+
+        if (!VoicePacket.TryParse(bytes, out VoicePacket? packet, out string parseError) || packet is null)
+        {
+            this._monitor.Log($"Discarded a malformed voice packet from {e.FromPlayerID}: {parseError}.", LogLevel.Trace);
+            return;
+        }
+
+        if (!PacketValidator.IsValid(packet, out string validationError))
+        {
+            this._monitor.Log($"Discarded an invalid voice packet from {e.FromPlayerID}: {validationError}.", LogLevel.Trace);
+            return;
+        }
+
+        if (!this._loggedFirstReceive)
+        {
+            this._loggedFirstReceive = true;
+            this._monitor.Log("Voice transport is receiving packets.", LogLevel.Trace);
+        }
+
+        this.PacketReceived?.Invoke(e.FromPlayerID, packet);
+    }
+
+    private static double GetTimestampSeconds()
+    {
+        return Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+    }
+}
