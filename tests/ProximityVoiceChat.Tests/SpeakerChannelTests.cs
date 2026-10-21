@@ -97,6 +97,29 @@ public class SpeakerChannelTests
     }
 
     [Fact]
+    public void Receive_CanSuppressAudioWhileTrackingSpeakingState()
+    {
+        using SpeakerChannel channel = new(1, "Alice");
+
+        Assert.True(channel.Receive(CreatePackets(0, 0)[0], 10d, enqueueAudio: false));
+        Assert.True(channel.IsSpeaking(10.2d));
+        Assert.Equal(0, channel.BufferedFrames);
+    }
+
+    [Fact]
+    public void DiscardBufferedAudio_KeepsSpeakingState()
+    {
+        using SpeakerChannel channel = new(1, "Alice");
+        channel.Receive(CreatePackets(0, 0)[0], 10d);
+
+        Assert.Equal(1, channel.BufferedFrames);
+        channel.DiscardBufferedAudio();
+
+        Assert.Equal(0, channel.BufferedFrames);
+        Assert.True(channel.IsSpeaking(10.2d));
+    }
+
+    [Fact]
     public void Receive_StoresDeclaredRadiusPerSpeaker()
     {
         using SpeakerChannel alice = new(1, "Alice");

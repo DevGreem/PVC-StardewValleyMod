@@ -16,19 +16,19 @@ public class IndicatorRulesTests
     }
 
     [Fact]
-    public void IsNearbySpeaking_RequiresAudibleVolumeAndSpeakingState()
+    public void IsNearbySpeaking_RequiresNearbyAndSpeakingState()
     {
-        Assert.True(IndicatorRules.IsNearbySpeaking(0.5f, true));
-        Assert.False(IndicatorRules.IsNearbySpeaking(0f, true));
-        Assert.False(IndicatorRules.IsNearbySpeaking(0.5f, false));
+        Assert.True(IndicatorRules.IsNearbySpeaking(true, true));
+        Assert.False(IndicatorRules.IsNearbySpeaking(false, true));
+        Assert.False(IndicatorRules.IsNearbySpeaking(true, false));
     }
 
     [Fact]
     public void IsNearbySpeaking_FollowsTheSpeakerDeclaredRadius()
     {
-        float insideSmall = ProximityMath.CalculateVolume("Farm", "Farm", 2f, 3f);
-        float outsideSmall = ProximityMath.CalculateVolume("Farm", "Farm", 3f, 3f);
-        float insideLarge = ProximityMath.CalculateVolume("Farm", "Farm", 6f, 10f);
+        bool insideSmall = ProximityMath.IsInRange(2f, 3f);
+        bool outsideSmall = ProximityMath.IsInRange(3f, 3f);
+        bool insideLarge = ProximityMath.IsInRange(6f, 10f);
 
         Assert.True(IndicatorRules.IsNearbySpeaking(insideSmall, true));
         Assert.False(IndicatorRules.IsNearbySpeaking(outsideSmall, true));

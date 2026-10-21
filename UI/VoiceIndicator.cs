@@ -20,9 +20,9 @@ public sealed class VoiceIndicator
         bool transmitting,
         ActivationMode activationMode,
         int voiceReach,
-        IReadOnlyList<string> speakers)
+        IReadOnlyList<VoiceIndicatorSpeaker> speakers)
     {
-        List<string> lines = new()
+        List<string> header = new()
         {
             microphoneEnabled
                 ? (transmitting ? "Mic: speaking" : activationMode == ActivationMode.PushToTalk ? "Mic: on (hold to talk)" : "Mic: on")
@@ -30,10 +30,64 @@ public sealed class VoiceIndicator
             IndicatorRules.FormatVoiceReach(voiceReach)
         };
 
-        if (speakers.Count > 0)
-            lines.Add("Nearby: " + string.Join(", ", speakers));
+        int lineHeight = Game1.smallFont.LineSpacing;
+        int width = 0;
+        foreach (string line in header)
+            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(line).X);
 
-        this.DrawPanel(batch, lines, 0f, null);
+        if (speakers.Count > 0)
+            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString("Nearby:").X);
+
+        foreach (VoiceIndicatorSpeaker speaker in speakers)
+            width = System.Math.Max(width, (int)Game1.smallFont.MeasureString(speaker.Name).X + 18);
+
+        int rowCount = header.Count + (speakers.Count > 0 ? 1 + speakers.Count : 0);
+        Rectangle background = new(8, 8, width + 16, (rowCount * lineHeight) + 12);
+        batch.Draw(Game1.staminaRect, background, Color.Black * 0.55f);
+
+        int y = 16;
+        foreach (string line in header)
+        {
+            DrawText(batch, line, 16, y, TextColor);
+            y += lineHeight;
+        }
+
+        if (speakers.Count == 0)
+            return;
+
+        DrawText(batch, "Nearby:", 16, y, TextColor);
+        y += lineHeight;
+
+        foreach (VoiceIndicatorSpeaker speaker in speakers)
+        {
+            DrawText(batch, speaker.Name, 16, y, TextColor);
+            if (speaker.IsMuted)
+                DrawMutedMic(batch, 16 + width - 12, y + 2);
+
+            y += lineHeight;
+        }
+    }
+
+    private static void DrawText(SpriteBatch batch, string text, int x, int y, Color color)
+    {
+        Vector2 position = new(x, y);
+        batch.DrawString(Game1.smallFont, text, position + new Vector2(1f, 1f), ShadowColor);
+        batch.DrawString(Game1.smallFont, text, position, color);
+    }
+
+    private static void DrawMutedMic(SpriteBatch batch, int x, int y)
+    {
+        Color mic = Color.White;
+        Color slash = new(255, 120, 120);
+
+        batch.Draw(Game1.staminaRect, new Rectangle(x + 3, y, 4, 7), mic);
+        batch.Draw(Game1.staminaRect, new Rectangle(x + 2, y + 1, 1, 5), mic);
+        batch.Draw(Game1.staminaRect, new Rectangle(x + 7, y + 1, 1, 5), mic);
+        batch.Draw(Game1.staminaRect, new Rectangle(x + 4, y + 7, 2, 3), mic);
+        batch.Draw(Game1.staminaRect, new Rectangle(x + 2, y + 10, 6, 1), mic);
+
+        for (int i = 0; i < 10; i++)
+            batch.Draw(Game1.staminaRect, new Rectangle(x + i, y + 10 - i, 1, 1), slash);
     }
 
     /// <summary>Draw the local microphone test overlay, including its input-level bar.</summary>

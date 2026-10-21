@@ -87,6 +87,20 @@ The menu SHALL provide an All view listing every current player in the server ex
 - **WHEN** a player joins or leaves the server
 - **THEN** the menu reflects the current player list the next time it is opened or refreshed
 
+### Requirement: Muted nearby players remain visible in the HUD
+
+The mod SHALL continue to show a nearby muted player who is speaking in the voice indicator, with a visible muted-microphone marker. Muting SHALL NOT remove the player from the nearby list while they are in range and speaking.
+
+#### Scenario: Muted player speaks nearby
+
+- **WHEN** a nearby player is muted and speaks
+- **THEN** the HUD lists that player with a muted-microphone marker
+
+#### Scenario: Muted player is out of range
+
+- **WHEN** a muted player is outside the local voice reach
+- **THEN** they are not listed in the nearby HUD
+
 ### Requirement: Local-only and non-interfering
 
 Mute state SHALL be local. It SHALL NOT be transmitted to other players, SHALL NOT change the voice protocol and SHALL NOT prevent a muted player from hearing the local player. The player-mute menu SHALL NOT change the existing HUD's click-through behavior, and SHALL NOT open in single-player.

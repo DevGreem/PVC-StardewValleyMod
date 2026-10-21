@@ -545,9 +545,6 @@ public sealed class ModEntry : Mod
         if (this._microphoneTestActive)
             return;
 
-        if (this._mutes.IsMuted(playerId))
-            return;
-
         if (!this._loggedModMessageHook)
         {
             this._loggedModMessageHook = true;
@@ -572,7 +569,7 @@ public sealed class ModEntry : Mod
         SpeakerChannel channel = this._speakers.GetOrAdd(playerId, _ => new SpeakerChannel(playerId, farmer.Name));
         channel.PlayerName = farmer.Name;
         channel.DistanceTiles = distance;
-        channel.Receive(packet, GetTimestampSeconds());
+        channel.Receive(packet, GetTimestampSeconds(), enqueueAudio: !this._mutes.IsMuted(playerId));
     }
 
     private void OnPeerLost(long playerId)
@@ -609,14 +606,18 @@ public sealed class ModEntry : Mod
 
         foreach (SpeakerChannel channel in this._speakers.Values)
         {
-            if (IndicatorRules.IsNearbySpeaking(channel.Volume, channel.IsSpeaking(now)))
+            if (IndicatorRules.IsNearbySpeaking(channel.IsNearby, channel.IsSpeaking(now)))
                 this._speakerScratch.Add(channel);
         }
 
         this._speakerScratch.Sort((first, second) => first.DistanceTiles.CompareTo(second.DistanceTiles));
-        string[] names = new string[Math.Min(this._speakerScratch.Count, 8)];
-        for (int i = 0; i < names.Length; i++)
-            names[i] = this._speakerScratch[i].PlayerName;
+        int speakerCount = Math.Min(this._speakerScratch.Count, 8);
+        VoiceIndicatorSpeaker[] speakers = new VoiceIndicatorSpeaker[speakerCount];
+        for (int i = 0; i < speakerCount; i++)
+        {
+            SpeakerChannel channel = this._speakerScratch[i];
+            speakers[i] = new VoiceIndicatorSpeaker(channel.PlayerName, this._mutes.IsMuted(channel.PlayerId));
+        }
 
         this._indicator.Draw(
             e.SpriteBatch,
@@ -624,7 +625,7 @@ public sealed class ModEntry : Mod
             this._capture.IsTransmittingNow,
             this._config.ActivationMode,
             this._config.ProximityRadius,
-            names);
+            speakers);
     }
 
     /// <summary>Start or stop the local microphone test from the panel or keybind.</summary>
@@ -771,6 +772,7 @@ public sealed class ModEntry : Mod
         foreach (KeyValuePair<long, SpeakerChannel> pair in this._speakers)
         {
             SpeakerChannel channel = pair.Value;
+            channel.IsNearby = false;
             double lastPacket = channel.LastPacketTime;
             if (lastPacket > 0d && now - lastPacket > ModConstants.StaleChannelMilliseconds / 1000d)
             {
@@ -796,13 +798,6 @@ public sealed class ModEntry : Mod
                 continue;
             }
 
-            if (this._mutes.IsMuted(channel.PlayerId))
-            {
-                channel.Volume = 0f;
-                channel.OcclusionAlphaTarget = 1f;
-                continue;
-            }
-
             float distance = Vector2.Distance(farmer.Tile, Game1.player.Tile);
             channel.DistanceTiles = distance;
 
@@ -810,6 +805,16 @@ public sealed class ModEntry : Mod
             {
                 channel.Volume = 0f;
                 channel.OcclusionAlphaTarget = 1f;
+                continue;
+            }
+
+            channel.IsNearby = true;
+
+            if (this._mutes.IsMuted(channel.PlayerId))
+            {
+                channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
+                channel.DiscardBufferedAudio();
                 continue;
             }
 
