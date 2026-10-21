@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ProximityVoiceChat</AssemblyName>
+    <RootNamespace>ProximityVoiceChat</RootNamespace>
+    <Version>0.1.0</Version>
+    <Platforms>AnyCPU</Platforms>
+    <EnableModDeploy>true</EnableModDeploy>
+    <EnableModZip>true</EnableModZip>
+    <BundleExtraAssemblies>ThirdParty</BundleExtraAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
+    <PackageReference Include="PortAudioSharp2" Version="1.0.6" />
+    <PackageReference Include="Concentus" Version="2.2.2" />
+  </ItemGroup>
+
+  <!-- The test project lives in this repo but is not part of the mod assembly. -->
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <None Remove="tests/**/*" />
+  </ItemGroup>
+
+  <!-- Restore all native PortAudio runtimes so the build can package every platform. -->
+  <ItemGroup>
+    <PackageReference Include="org.k2fsa.portaudio.runtime.win-x64" Version="1.0.6" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="org.k2fsa.portaudio.runtime.linux-x64" Version="1.0.6" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="org.k2fsa.portaudio.runtime.linux-aarch64" Version="1.0.6" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="org.k2fsa.portaudio.runtime.osx-x64" Version="1.0.6" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="org.k2fsa.portaudio.runtime.osx-arm64" Version="1.0.6" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="$(Pkgorg_k2fsa_portaudio_runtime_win-x64)/runtimes/win-x64/native/portaudio.dll" Link="lib/win-x64/portaudio.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(Pkgorg_k2fsa_portaudio_runtime_linux-x64)/runtimes/linux-x64/native/libportaudio.so" Link="lib/linux-x64/libportaudio.so" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(Pkgorg_k2fsa_portaudio_runtime_linux-aarch64)/runtimes/linux-arm64/native/libportaudio.so" Link="lib/linux-arm64/libportaudio.so" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(Pkgorg_k2fsa_portaudio_runtime_osx-x64)/runtimes/osx-x64/native/libportaudio.dylib" Link="lib/osx-x64/libportaudio.dylib" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(Pkgorg_k2fsa_portaudio_runtime_osx-arm64)/runtimes/osx-arm64/native/libportaudio.dylib" Link="lib/osx-arm64/libportaudio.dylib" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
