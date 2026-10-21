@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using ProximityVoiceChat.Config;
 using StardewValley;
 using StardewValley.Menus;
 
@@ -12,11 +11,10 @@ namespace ProximityVoiceChat.UI;
 /// <summary>A small menu for muting current players locally.</summary>
 public sealed class PlayerMuteMenu : IClickableMenu
 {
-    private const int MenuWidth = 520;
+    private const int MenuWidth = 700;
     private const int MenuHeight = 460;
     private const int RowHeight = 36;
 
-    private readonly ModConfig _config;
     private readonly Func<IReadOnlyList<PlayerMuteCandidate>> _snapshot;
     private readonly Action<long, string> _toggle;
     private readonly List<(Rectangle Bounds, PlayerMuteRow Row)> _rowBounds = new();
@@ -28,7 +26,6 @@ public sealed class PlayerMuteMenu : IClickableMenu
     private IReadOnlyList<PlayerMuteRow> _rows = Array.Empty<PlayerMuteRow>();
 
     public PlayerMuteMenu(
-        ModConfig config,
         Func<IReadOnlyList<PlayerMuteCandidate>> snapshot,
         Action<long, string> toggle)
         : base(
@@ -38,7 +35,6 @@ public sealed class PlayerMuteMenu : IClickableMenu
             MenuHeight,
             showUpperRightCloseButton: false)
     {
-        this._config = config;
         this._snapshot = snapshot;
         this._toggle = toggle;
     }
@@ -81,7 +77,7 @@ public sealed class PlayerMuteMenu : IClickableMenu
                 this._rowBounds.Add((bounds, row));
 
                 b.Draw(Game1.staminaRect, bounds, row.IsMuted ? Color.DarkRed * 0.65f : Color.DimGray * 0.45f);
-                string label = $"{row.Name}  [{row.Location}]";
+                string label = $"{row.Name}  [{row.Location}, {row.VoiceReach} tiles]";
                 b.DrawString(Game1.smallFont, label, new Vector2(bounds.X + 10, bounds.Y + 6), Color.White);
                 string state = row.IsMuted ? "Muted" : "Unmuted";
                 Vector2 stateSize = Game1.smallFont.MeasureString(state);
@@ -165,8 +161,7 @@ public sealed class PlayerMuteMenu : IClickableMenu
             local.currentLocation.NameOrUniqueName,
             (int)local.Tile.X,
             (int)local.Tile.Y,
-            this._nearbyOnly,
-            this._config.ProximityRadius);
+            this._nearbyOnly);
     }
 
     private void DrawTab(SpriteBatch b, Rectangle bounds, string label, bool selected)

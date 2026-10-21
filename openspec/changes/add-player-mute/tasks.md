@@ -8,7 +8,7 @@
 
 ## 2. Player-mute menu
 
-- [x] 2.1 Add a pure menu model that builds Nearby and All rows from `Game1.otherFarmers`, filtering Nearby by same location and the local voice reach; verify tests cover other locations, distance, sorting and mute state
+- [x] 2.1 Add a pure menu model that builds Nearby and All rows from `Game1.otherFarmers`, filtering Nearby by same location and each player's declared voice reach; verify tests cover other locations, differing reaches, sorting and mute state
 - [x] 2.2 Implement `PlayerMuteMenu : IClickableMenu` with Nearby/All views, player rows, mute toggles, close behavior and immediate `SaveConfig`; verify the menu lists current players and reflects state changes
 - [x] 2.3 Wire `PlayerMuteKey` in `OnButtonPressed`: open the menu only in multiplayer, suppress the key and do not open over another menu; verify single-player and keybind behavior
 - [x] 2.4 Show muted nearby players in the HUD with a muted-microphone marker while keeping the HUD click-through; verify a muted silent player remains visible and an out-of-range one does not

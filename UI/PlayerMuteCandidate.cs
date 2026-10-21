@@ -7,6 +7,7 @@ public readonly record struct PlayerMuteCandidate(
     string Location,
     int TileX,
     int TileY,
+    int VoiceReach,
     bool IsMuted);
 
 /// <summary>A rendered row in the player-mute menu.</summary>
@@ -14,5 +15,6 @@ public sealed record PlayerMuteRow(
     long PlayerId,
     string Name,
     string Location,
+    int VoiceReach,
     bool IsMuted,
     float Distance);
