@@ -43,11 +43,12 @@ public class VoiceRecipientRulesTests
     }
 
     [Fact]
-    public void IsKnownFarmer_OnlyMatchesCurrentIds()
+    public void IsKnownFarmer_MatchesCurrentIdsAndTheHost()
     {
         long[] ids = { 10, 20 };
 
         Assert.True(VoiceTransport.IsKnownFarmer(10, ids));
-        Assert.False(VoiceTransport.IsKnownFarmer(30, ids));
+        Assert.True(VoiceTransport.IsKnownFarmer(30, ids, hostPlayerId: 30));
+        Assert.False(VoiceTransport.IsKnownFarmer(40, ids, hostPlayerId: 30));
     }
 }
