@@ -39,6 +39,7 @@ public sealed class ModEntry : Mod
     private bool _microphoneWasEnabledBeforeTest;
     private bool _testPlaybackWasRunningBefore;
     private bool _testMonitorAvailable;
+    private bool _effectiveWallOcclusion = true;
     private volatile float _microphoneTestLevel;
     private bool _pushToTalkHeld;
     private bool _loggedUpdateTick;
@@ -57,6 +58,9 @@ public sealed class ModEntry : Mod
     public bool IsMicrophoneTestMonitoring => this._microphoneTestActive && this._testMonitorAvailable;
 
     public float MicrophoneTestLevel => this._microphoneTestLevel;
+
+    /// <summary>The host-controlled wall-occlusion value used by local playback.</summary>
+    public bool EffectiveWallOcclusion => this._effectiveWallOcclusion;
 
     public override void Entry(IModHelper helper)
     {
@@ -81,7 +85,9 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.OneSecondUpdateTicked += this.OnOneSecondUpdateTicked;
         helper.Events.Input.ButtonPressed += this.OnButtonPressed;
         helper.Events.Input.ButtonReleased += this.OnButtonReleased;
+        helper.Events.Multiplayer.PeerConnected += this.OnPeerConnected;
         helper.Events.Multiplayer.PeerDisconnected += this.OnPeerDisconnected;
+        helper.Events.Multiplayer.ModMessageReceived += this.OnWallOcclusionMessageReceived;
         helper.Events.Display.RenderedHud += this.OnRenderedHud;
     }
 
@@ -118,6 +124,24 @@ public sealed class ModEntry : Mod
     public void SaveConfig()
     {
         this._configManager.Save(this._config);
+    }
+
+    /// <summary>Change the host-authoritative wall-occlusion setting; clients cannot override it.</summary>
+    public void SetWallOcclusion(bool enabled)
+    {
+        if (!Context.IsMainPlayer)
+        {
+            this.Monitor.Log("Only the host can change wall occlusion; clients follow the host.", LogLevel.Info);
+            return;
+        }
+
+        if (this._config.WallOcclusion == enabled && this._effectiveWallOcclusion == enabled)
+            return;
+
+        this._config.WallOcclusion = enabled;
+        this._effectiveWallOcclusion = enabled;
+        this.OnConfigChanged();
+        this.SendWallOcclusion();
     }
 
     /// <summary>Toggle the microphone and open or close the capture stream immediately.</summary>
@@ -188,6 +212,12 @@ public sealed class ModEntry : Mod
         this._transport.ReleaseAll();
         this.ClearSpeakers();
 
+        this._effectiveWallOcclusion = WallOcclusionSync.ResolveEffective(
+            Context.IsMainPlayer,
+            this._config.WallOcclusion,
+            hasHostValue: false,
+            hostValue: false);
+
         this._capture.SessionActive = this.IsMultiplayerWorld();
         this.UpdateCaptureSettings();
         this._nextPlaybackAttempt = 0d;
@@ -203,6 +233,11 @@ public sealed class ModEntry : Mod
             this.Monitor.Log($"Incoming voice is unavailable: {error}.", LogLevel.Error);
 
         this.StartMicrophoneFromConfig();
+
+        if (Context.IsMainPlayer)
+            this.SendWallOcclusion();
+        else
+            this.RequestWallOcclusion();
     }
 
     /// <summary>Apply the persisted start preference once the multiplayer session is ready.</summary>
@@ -236,6 +271,8 @@ public sealed class ModEntry : Mod
         this._audio.StopPlayback();
         this._transport.ReleaseAll();
         this.ClearSpeakers();
+
+        this._effectiveWallOcclusion = true;
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -355,6 +392,93 @@ public sealed class ModEntry : Mod
     {
         this.Monitor.Log($"Player {e.Peer.PlayerID} disconnected; releasing their voice state.", LogLevel.Trace);
         this._transport.Release(e.Peer.PlayerID);
+    }
+
+    private void OnPeerConnected(object? sender, PeerConnectedEventArgs e)
+    {
+        this.SendWallOcclusion(e.Peer.PlayerID);
+    }
+
+    private void SendWallOcclusion(long? playerId = null)
+    {
+        if (!Context.IsMainPlayer || !this.IsMultiplayerWorld())
+            return;
+
+        this.Helper.Multiplayer.SendMessage(
+            new WallOcclusionMessage { Enabled = this._config.WallOcclusion },
+            ModConstants.WallOcclusionMessageType,
+            new[] { ModConstants.ModId },
+            playerId.HasValue ? new[] { playerId.Value } : null);
+    }
+
+    private void RequestWallOcclusion()
+    {
+        if (Context.IsMainPlayer || !this.IsMultiplayerWorld())
+            return;
+
+        long hostPlayerId = Game1.MasterPlayer?.UniqueMultiplayerID ?? 0L;
+        this.Helper.Multiplayer.SendMessage(
+            new WallOcclusionMessage { Request = true },
+            ModConstants.WallOcclusionMessageType,
+            new[] { ModConstants.ModId },
+            hostPlayerId != 0L ? new[] { hostPlayerId } : null);
+    }
+
+    private void OnWallOcclusionMessageReceived(object? sender, ModMessageReceivedEventArgs e)
+    {
+        if (!Context.IsWorldReady || !Context.IsMultiplayer)
+            return;
+
+        if (!WallOcclusionSync.IsSettingsMessage(e.FromModID, e.Type))
+            return;
+
+        WallOcclusionMessage? message;
+        try
+        {
+            message = e.ReadAs<WallOcclusionMessage>();
+        }
+        catch (Exception ex)
+        {
+            this.Monitor.Log($"Discarded a wall-occlusion setting that could not be read: {ex.Message}", LogLevel.Trace);
+            return;
+        }
+
+        if (message is null)
+            return;
+
+        if (Context.IsMainPlayer)
+        {
+            long localPlayerId = Game1.player?.UniqueMultiplayerID ?? 0L;
+            if (WallOcclusionSync.ShouldReplyToRequest(
+                isMainPlayer: true,
+                e.FromPlayerID,
+                localPlayerId,
+                e.FromModID,
+                e.Type,
+                message.Request))
+            {
+                this.SendWallOcclusion(e.FromPlayerID);
+            }
+
+            return;
+        }
+
+        if (message.Request)
+            return;
+
+        long hostPlayerId = Game1.MasterPlayer?.UniqueMultiplayerID ?? 0L;
+        if (!WallOcclusionSync.ShouldApplyFromHost(
+            Context.IsMainPlayer,
+            e.FromPlayerID,
+            hostPlayerId,
+            e.FromModID,
+            e.Type))
+        {
+            return;
+        }
+
+        this._effectiveWallOcclusion = message.Enabled;
+        this.Monitor.Log($"Host wall occlusion: {(message.Enabled ? "enabled" : "disabled")}.", LogLevel.Info);
     }
 
     private void OnVoicePacketReceived(long playerId, VoicePacket packet)
@@ -600,6 +724,7 @@ public sealed class ModEntry : Mod
             if (!ProximityMath.IsSameLocation(localLocation, farmer.currentLocation.NameOrUniqueName))
             {
                 channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
                 continue;
             }
 
@@ -609,14 +734,33 @@ public sealed class ModEntry : Mod
             if (!ProximityMath.IsInRange(distance, channel.ProximityRadius))
             {
                 channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
                 continue;
             }
 
-            channel.Volume = ProximityMath.CalculateVolume(
+            float distanceGain = ProximityMath.CalculateVolume(
                 localLocation,
                 farmer.currentLocation.NameOrUniqueName,
                 distance,
                 channel.ProximityRadius);
+
+            if (distanceGain <= 0f)
+            {
+                channel.Volume = 0f;
+                channel.OcclusionAlphaTarget = 1f;
+                continue;
+            }
+
+            int obstacles = this._effectiveWallOcclusion
+                ? WallOcclusion.CountObstacles(Game1.player.currentLocation, farmer.Tile, Game1.player.Tile)
+                : 0;
+
+            bool inCave = EnvironmentAcoustics.IsCave(Game1.player.currentLocation);
+            float gain = distanceGain * OcclusionMath.Gain(obstacles);
+            float alpha = OcclusionMath.LowPassAlpha(obstacles);
+
+            channel.Volume = EnvironmentAcoustics.ApplyGain(gain, inCave);
+            channel.OcclusionAlphaTarget = EnvironmentAcoustics.ApplyLowPassAlpha(alpha, inCave);
 
             if (channel.Volume > 0f)
                 this._speakerScratch.Add(channel);

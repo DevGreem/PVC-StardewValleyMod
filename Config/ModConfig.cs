@@ -25,6 +25,9 @@ public sealed class ModConfig
     /// <summary>Master playback volume for incoming voice, from 0 to 100.</summary>
     public int PlaybackVolume { get; set; } = ModConstants.DefaultPlaybackVolume;
 
+    /// <summary>The host's preference for static wall occlusion; clients ignore their local value during a session.</summary>
+    public bool WallOcclusion { get; set; } = true;
+
     /// <summary>How far the local player's voice carries, in tiles. Must be one of <see cref="ModConstants.ProximityRadii"/>.</summary>
     public int ProximityRadius { get; set; } = ModConstants.DefaultProximityRadius;
 
@@ -67,6 +70,7 @@ public sealed class ModConfig
         this.InputDeviceName = "";
         this.OutputDeviceName = "";
         this.PlaybackVolume = ModConstants.DefaultPlaybackVolume;
+        this.WallOcclusion = true;
         this.ProximityRadius = ModConstants.DefaultProximityRadius;
         this.ActivationMode = ActivationMode.VoiceActivity;
         this.VoiceSensitivity = ModConstants.DefaultSensitivity;
