@@ -11,6 +11,8 @@
     <EnableModDeploy>true</EnableModDeploy>
     <EnableModZip>true</EnableModZip>
     <BundleExtraAssemblies>ThirdParty</BundleExtraAssemblies>
+    <!-- Aseprite sources are design files, not part of the release package. -->
+    <IgnoreModFilePatterns>\.aseprite$</IgnoreModFilePatterns>
   </PropertyGroup>
 
   <ItemGroup>
