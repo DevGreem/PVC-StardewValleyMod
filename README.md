@@ -1,14 +1,54 @@
 # Proximity Voice Chat (PVC)
 
-Proximity voice chat for **Stardew Valley multiplayer**, built as a SMAPI mod. It captures
-the local microphone, sends Opus frames through the game's own multiplayer network, and plays
-other farmers' voices back with volume based on how far away they stand. There is no Discord
-bot, no token and no external voice service: install the mod and talk.
+## [About This Mod]
+
+This mod adds in-game proximity voice chat to **Stardew Valley multiplayer**.
+It captures the local microphone, and plays other farmers' voices back with a
+volume that depends on how far away they stand.
+
+There is no Discord bot, no token and no external voice service: install the mod and talk.
 
 This is the successor to [LVC](https://github.com/DevGreem/LVC-StardewValleyMod), which delegates
-voice to Discord. PVC is a separate mod with its own settings file; do not run both at once.
+voice to Discord. PVC is a separate mod with its own settings file
 
-## Requirements
+## [How it works]
+
+Voice travels over SMAPI mod messages, which are reliable and relayed by the host. That needs no
+port forwarding, NAT traversal or relay server, and works in vanilla multiplayer sessions. The
+trade-off is latency: it is higher than a dedicated voice protocol.
+
+Every incoming packet passes three gates:
+
+1. **Same location.** The speaker's current game location must match the local player's. No voice
+   is played across the farm, the town, a mine level or a building interior.
+2. **Distance.** The speaker declares their voice reach in each packet. Inside that radius, volume
+   falls off linearly: full volume next to the player, silence at the radius. The closest speakers
+   are mixed first when more than eight are in range at once.
+3. **Static walls.** The line between the speaker and the listener is traced over the map's
+   `Buildings` layer and the footprints of constructed buildings (cabins, sheds, barns and coops).
+   One obstacle makes the voice quieter and muffled; two make it much quieter and heavily muffled;
+   three or more make it silent. Open or passable doors do not block, while closed doors do.
+   Player-placed objects, trees and furniture are not considered yet.
+
+In mines and farm caves, incoming voice gets a short echo/reverb and a mild attenuation, so the
+cave sounds enclosed and immersive instead of just quieter. The cave echo is independent of
+`WallOcclusion` and applies even when wall occlusion is disabled by the host. The local microphone
+test monitor stays clean; the echo is only applied to remote voice playback.
+
+Wall occlusion is controlled by the **host**. The host's choice is sent to every client and
+applies immediately; clients follow it and cannot override it locally. If the host does not run
+PVC, no host value arrives and wall occlusion stays enabled for every client. The line of sight
+itself is computed locally by each listener from its own map and the farmers' game-state
+positions; wall data is never sent.
+
+The sender's position is never read from the packet. The receiver looks it up in the game's own
+farmer state, so editing the mod cannot make a speaker sound closer than they are.
+
+Packets are kept small (16 kbps Opus, 20 ms frames, at most 256 bytes of audio) so voice stays a
+rounding error next to the game's own traffic. The host relays every packet, so very large
+sessions cost the host more.
+
+## [Requirements]
 
 - Stardew Valley **1.6** (the current 1.6.x builds).
 - **SMAPI 4.0 or later**.
@@ -17,10 +57,10 @@ voice to Discord. PVC is a separate mod with its own settings file; do not run b
 - **Every player in the session must install the mod.** A player who does not have it cannot be
   heard and hears nobody.
 
-## Installation
+## [Installation Guide]
 
 1. Install SMAPI.
-2. Build the mod (see below) or unzip the release archive.
+2. Build the mod (see [Building and testing](#building-and-testing)) or unzip the release archive.
 3. Copy the resulting `ProximityVoiceChat` folder into `Stardew Valley/Mods`.
 4. Start the game through SMAPI and check the SMAPI console for the mod's startup lines.
 
@@ -37,42 +77,33 @@ All portable native audio libraries are shipped in `ProximityVoiceChat/lib`:
 Keep the `lib` folder next to the DLL. If the native library cannot be loaded, the mod reports
 the expected path and disables voice chat instead of crashing the game.
 
-## Controls
+## [How Setup Voice Chat]
 
-The defaults are deliberately outside Stardew Valley's usual bindings. All five keys can be
-changed in the in-game settings panel, and any key the game can bind is accepted.
+1. Install the mod on **every** player's machine, as described above.
+2. Start the game through SMAPI and load a multiplayer save.
+3. The microphone starts according to `StartMicrophoneEnabled`, which is **disabled by default**.
+   Press `F7` (or use the settings panel) to enable it. During a session, `F7` and the panel's
+   microphone control change only the current state; they never rewrite the saved start
+   preference.
+4. Pick `InputDeviceName` and `OutputDeviceName` in the settings panel if the system defaults are
+   not the devices you want.
+5. Choose how you transmit: **push-to-talk** (hold `V`) or **voice activity** (speak above the
+   sensitivity threshold). Both laws are selected in the settings panel.
+6. Pick your voice reach with `F8` (`3`, `15` or `30` tiles).
 
-| Action | Default key |
-| --- | --- |
-| Push to talk (hold) | `V` |
-| Toggle microphone | `F7` |
-| Cycle voice reach | `F8` |
-| Start or stop microphone test | `F9` |
-| Open player mute menu | `F10` |
-
-`MicrophoneTestKey` defaults to `F9`. If that key is already used by another PVC action (for
-example, a custom microphone toggle), the mod moves the test key to the next free function key
-when the settings load, so existing binds keep working. The settings panel always shows the
-effective key.
-
-The microphone starts according to the persisted `StartMicrophoneEnabled` setting, which is
-**disabled by default**. When it is disabled, press `F7` (or use the settings panel) to enable it
-after loading a multiplayer save. During a session, `F7` and the panel's microphone control change
-only the current state; they never rewrite the saved start preference.
-
-Push-to-talk transmits only while `V` is held. Voice activity transmits only frames louder than
-the configured sensitivity threshold. The two modes are selected in the settings panel.
+Most changes apply live, while `StartMicrophoneEnabled` applies on the next multiplayer load.
 
 ### Microphone test
 
-Press the configured microphone-test key (default `F9`; see the collision note above), or enable
-**Microphone test active** in the settings panel, to test the selected microphone without another
-player. The test works in single-player and multiplayer, but only while a world is loaded. It
-stops automatically when you return to the title screen.
+Press the configured microphone-test key (default `F9`; see the collision note in
+[Default Controls](#default-controls)), or enable **Microphone test active** in the settings panel,
+to test the selected microphone without another player. The test works in single-player and
+multiplayer, but only while a world is loaded. It stops automatically when you return to the title
+screen.
 
 While the test is active, normal voice chat is paused and the HUD shows the input level in dBFS.
-Test audio is **never transmitted and never recorded**: the mod opens the input only for this
-local test and does not send voice packets.
+Test audio is **never transmitted and never recorded**: the mod opens the input only for this local
+test and does not send voice packets.
 
 Enable **Monitor microphone during test** to hear your own microphone through the selected output.
 Monitoring is off by default to prevent feedback. The monitor uses `PlaybackVolume`, the same
@@ -84,7 +115,7 @@ Headphones are strongly recommended before enabling monitoring.
 Press `F10` (or the configured player-mute key) to open the local player menu. It has two views:
 
 - **Nearby:** players in the same game location within the voice reach declared by **that player**,
-  so someone with a 20-tile reach appears even if your own reach is only 3.
+  so someone with a 30-tile reach appears even if your own reach is only 3.
 - **All:** every player currently in the server, regardless of location or distance.
 
 Click a player row to mute or unmute that player. Each row shows the player's own voice reach.
@@ -94,30 +125,42 @@ is nearby still appears in the HUD with a muted-microphone icon, even while they
 you can see who you have silenced. The HUD stays click-through; the menu is the interactive
 surface. Resetting the settings clears the mute list.
 
-## Settings
+## [Config Voice Chat]
 
 Settings live in `Mods/ProximityVoiceChat/config.json` and are created with these defaults on
 first run. Generic Mod Config Menu is optional; when installed it exposes every option below.
-Most changes apply live, while `StartMicrophoneEnabled` applies on the next multiplayer load.
+
+### General
 
 | Setting | Default | Description |
 | --- | --- | --- |
 | `InputDeviceName` | `""` (system default) | Microphone used for capture. |
 | `OutputDeviceName` | `""` (system default) | Device that plays incoming voice. |
 | `PlaybackVolume` | `100` | Master volume for incoming voice and the microphone-test monitor, 0–100. |
-| `WallOcclusion` | `true` | Host-controlled: walls and closed doors reduce and muffle incoming voice. Clients follow the host and cannot change it. |
-| `ProximityRadius` | `15` tiles | How far your voice carries: one of `3`, `15`, `30`. It does not filter the voice you hear. |
 | `ActivationMode` | `VoiceActivity` | `PushToTalk` or `VoiceActivity`. |
 | `VoiceSensitivity` | `50` | Voice-activity threshold, 0 (loud speech only) to 100 (very quiet speech). |
 | `StartMicrophoneEnabled` | `false` | When true, the next multiplayer world starts with the microphone enabled. The in-game toggle does not change this setting. |
+| `MutedPlayers` | `[]` | Players muted locally; managed from the player menu and saved in the config. |
+| `ShowIndicator` | `true` | Draws the on-screen voice indicator. |
+
+### Host
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `WallOcclusion` | `true` | Host-controlled: walls and closed doors reduce and muffle incoming voice. Clients follow the host and cannot change it. |
+
+### Keys
+
+| Setting | Default | Description |
+| --- | --- | --- |
 | `PushToTalkKey` | `V` | Key held to transmit in push-to-talk mode. |
 | `MicrophoneToggleKey` | `F7` | Toggles the microphone. |
 | `MicrophoneTestKey` | `F9` | Starts and stops the local microphone test. |
 | `MicrophoneTestMonitor` | `false` | Plays the microphone test through the selected output at `PlaybackVolume`. |
 | `CycleRadiusKey` | `F8` | Cycles through the offered radii. |
 | `PlayerMuteKey` | `F10` | Opens the local player-mute menu. |
-| `MutedPlayers` | `[]` | Players muted locally; managed from the player menu and saved in the config. |
-| `ShowIndicator` | `true` | Draws the on-screen voice indicator. |
+
+### Live changes and migration
 
 Changing volume, voice reach, wall occlusion, the player-mute key or activation mode takes effect
 immediately. Muting or unmuting a player applies on the next frame. Changing an input or output
@@ -132,12 +175,6 @@ Choose `3` for a quiet conversation, `15` for normal conversation or `30` for lo
 Config files from older builds are migrated as `6 -> 3`, `10 -> 15` and `20 -> 30`; `3` and `15`
 remain unchanged.
 
-Proximity is a playback rule, not a confidentiality boundary. Honest clients address outgoing
-voice only to peers in the same location and inside the declared reach, but a modified client can
-still send voice to every peer, and the host can inspect session traffic. SMAPI does not
-authenticate the sender ID, so voice attribution and local mute are advisory rather than
-cryptographic guarantees.
-
 Config files created by older builds do not contain `StartMicrophoneEnabled`, `MicrophoneTestKey`,
 `MicrophoneTestMonitor`, `WallOcclusion`, `PlayerMuteKey` or `MutedPlayers`; they load as `false`,
 `F9`, `false`, `true`, `F10` and an empty list, so the microphone starts muted, the test remains
@@ -147,6 +184,62 @@ local value is ignored.
 
 If the settings file is missing or cannot be parsed, the mod starts with the defaults, logs the
 problem and keeps a copy of the unreadable file as `config.json.broken`.
+
+## [Possible doubts]
+
+- **Do all players need the mod?**
+
+  No, but a player without PVC cannot be heard and hears nobody, and nothing in the SMAPI console
+  warns the others about it.
+
+- **Can I run LVC and PVC at the same time?**
+
+  Maybe (I don't tested it)
+
+- **Is there a location limit?**
+
+  No. Voice is only played between players in the same game location, and at most eight speakers
+  are mixed at once (the closest ones). There is no hard cap on the number of locations.
+
+- **Does it work in single-player?**
+
+  Voice has no effect in single-player: the microphone is not opened, nothing is transmitted and
+  no indicator is drawn. The microphone test is the only feature that opens the microphone outside
+  multiplayer, and it never sends audio.
+
+- **Does the mod record anything?**
+
+  No. Voice lives in memory only for the lifetime of a packet. Nothing is recorded or written to
+  disk, and the microphone test audio never leaves the machine.
+
+- **Can someone cheat the proximity rules?**
+
+  Proximity is a playback rule, not a confidentiality boundary. Honest clients address outgoing
+  voice only to peers in the same location and inside the declared reach, but a modified client
+  can still send voice to every peer, and the host can inspect session traffic. SMAPI does not
+  authenticate the sender ID, so voice attribution and local mute are advisory rather than
+  cryptographic guarantees.
+
+## [Default Controls]
+
+The defaults are deliberately outside Stardew Valley's usual bindings. All keys can be changed in
+the in-game settings panel, and any key the game can bind is accepted.
+
+| Action | Default key |
+| --- | --- |
+| Push to talk (hold) | `V` |
+| Toggle microphone | `F7` |
+| Cycle voice reach | `F8` |
+| Start or stop microphone test | `F9` |
+| Open player mute menu | `F10` |
+
+`MicrophoneTestKey` defaults to `F9`. If that key is already used by another PVC action (for
+example, a custom microphone toggle), the mod moves the test key to the next free function key
+when the settings load, so existing binds keep working. The settings panel always shows the
+effective key.
+
+Push-to-talk transmits only while `V` is held. Voice activity transmits only frames louder than
+the configured sensitivity threshold. The two modes are selected in the settings panel.
 
 ## On-screen indicator
 
@@ -166,62 +259,6 @@ While the microphone test is active, a separate test overlay always shows the in
 whether monitoring is on, even in single-player and even if the normal indicator is hidden. It
 also shows the key that stops the test.
 
-## How proximity works
-
-Three gates are applied to every incoming packet:
-
-1. **Same location.** The speaker's current game location must match the local player's. No voice
-   is played across the farm, the town, a mine level or a building interior.
-2. **Distance.** The speaker declares their voice reach in each packet. Inside that radius, volume
-   falls off linearly: full volume next to the player, silence at the radius. The closest speakers
-   are mixed first when more than eight are in range at once.
-3. **Static walls.** The line between the speaker and the listener is traced over the map's
-   `Buildings` layer and the footprints of constructed buildings (cabins, sheds, barns and coops).
-   One obstacle (one contiguous wall segment or one constructed building) makes the voice quieter
-   and muffled; two make it much quieter and heavily muffled; three or more make it silent. This is
-   why a cabin between two farmers still lets them hear each other quietly instead of cutting the
-   voice completely. Open or passable doors on the map layer do not block, while closed doors do.
-   Player-placed objects, trees and furniture are not considered yet.
-
-In mines and farm caves, incoming voice gets a short echo/reverb and a mild attenuation, so the
-cave sounds enclosed and immersive instead of just quieter. The cave echo is independent of
-`WallOcclusion` and applies even when wall occlusion is disabled by the host. The local microphone
-test monitor stays clean; the echo is only applied to remote voice playback.
-
-The listener's own configured radius does not gate incoming voice. It is the local player's
-outgoing reach, so changing it changes how far others can hear you, not how far you hear them.
-
-Wall occlusion is controlled by the **host**. The host's choice is sent to every client and applies
-immediately; clients follow it and cannot override it locally. If the host does not run PVC, no host
-value arrives and wall occlusion stays enabled for every client.
-
-The line of sight itself is computed locally by each listener from its own map and the farmers'
-game-state positions. Only the host's on/off preference is synchronized; wall data is never sent.
-
-The sender's position is never read from the packet. The receiver looks it up in the game's own
-farmer state, so editing the mod cannot make a speaker sound closer than they are.
-
-## Version compatibility
-
-The wire format carries a version byte. This build declares **wire-format version 1**. A packet
-with a different version is discarded without producing audio. This build sends the current
-`3`, `15` and `30` reach values and also accepts the legacy `6`, `10` and `20` values from older
-speakers. Older clients still reject the new `30` value, so all players should update together to
-use the full range. A wire-format change is a breaking release and is called out in the release
-notes.
-
-## Multiplayer and latency
-
-Voice travels over SMAPI mod messages, which are reliable and relayed by the host. This needs no
-port forwarding, NAT traversal or relay server, and works in vanilla multiplayer sessions. The
-trade-off is latency: it is higher than a dedicated voice protocol. Packets are kept small
-(16 kbps Opus, 20 ms frames, at most 256 bytes of audio) so voice stays a rounding error next to
-the game's own traffic. The host relays every packet, so very large sessions cost the host more.
-
-Outside the explicit microphone test, voice has **no effect in single-player**: the microphone is
-not opened, nothing is transmitted and no indicator is drawn. The microphone test is the only
-feature that opens the microphone outside multiplayer, and it never sends audio.
-
 ## Privacy
 
 - The microphone starts disabled by default. It opens when joining a multiplayer world only if
@@ -237,6 +274,15 @@ feature that opens the microphone outside multiplayer, and it never sends audio.
   never wall data or voice occlusion values.
 - Player mutes are local and stored in your config; they are never transmitted to other players.
 - The indicator always shows whether your microphone is transmitting.
+
+## Version compatibility
+
+The wire format carries a version byte. This build declares **wire-format version 1**. A packet
+with a different version is discarded without producing audio. This build sends the current
+`3`, `15` and `30` reach values and also accepts the legacy `6`, `10` and `20` values from older
+speakers. Older clients still reject the new `30` value, so all players should update together to
+use the full range. A wire-format change is a breaking release and is called out in the release
+notes.
 
 ## Building and testing
 
