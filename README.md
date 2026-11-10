@@ -54,8 +54,10 @@ sessions cost the host more.
 - **SMAPI 4.0 or later**.
 - Windows, macOS or Linux, on x64 (Apple Silicon and Linux arm64 are also packaged).
 - A microphone and an output device.
-- **Every player in the session must install the mod.** A player who does not have it cannot be
-  heard and hears nobody.
+- **Every player who wants voice chat must install the mod.** Players without it keep playing
+  normally; they simply cannot be heard and hear nobody.
+- **The host needs SMAPI**, even if the host does not install this mod: SMAPI relays the voice
+  messages between players.
 
 ## [Installation Guide]
 
@@ -189,8 +191,10 @@ problem and keeps a copy of the unreadable file as `config.json.broken`.
 
 - **Do all players need the mod?**
 
-  No, but a player without PVC cannot be heard and hears nobody, and nothing in the SMAPI console
-  warns the others about it.
+  No. Only the players who want voice chat need it; everyone else keeps playing normally. A player
+  without PVC cannot be heard and hears nobody, and nothing in the SMAPI console warns the others
+  about it. The host does need SMAPI, because SMAPI relays the voice messages, but the host does
+  not need this mod.
 
 - **Can I run LVC and PVC at the same time?**
 
@@ -314,9 +318,9 @@ put the path in `~/stardewvalley.targets`:
   `lib/<platform>` folder shipped with the mod is present and that the game can read it.
 - **"Could not open microphone"** — the selected device is busy or gone. Pick another device in
   the settings panel; the mod also falls back to the system default and logs the substitution.
-- **No voices are heard** — confirm every player installed the same major version, everyone is in
-  the same game location, and the speakers are inside their own declared voice reach. Players
-  without the mod are silently inaudible.
+- **No voices are heard** — confirm everyone who wants voice installed the same major version,
+  everyone is in the same game location, and the speakers are inside their own declared voice
+  reach. Players without the mod are silently inaudible.
 - **One player is silent although nearby** — open the player mute menu (`F10`) and check whether
   that player is muted locally. Mutes are saved and only affect your playback.
 - **Voice sounds muffled or very quiet near a building** — static walls are occluding the speaker.
